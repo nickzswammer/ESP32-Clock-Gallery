@@ -21,7 +21,7 @@ void displayImageFromBin(File& file);
 void setup() {
   Serial.begin(115200);
   display.init(115200);
-  SD.begin(CS_SD); // change this to your SD_CS pin
+  SD.begin(CS_SD);  // change this to your SD_CS pin
 }
 
 void loop() {
@@ -30,7 +30,7 @@ void loop() {
   while (true) {
     File file = root.openNextFile();
     if (!file) {
-      root.rewindDirectory(); // start over from beginning
+      root.rewindDirectory();  // start over from beginning
       continue;
     }
 
@@ -44,7 +44,7 @@ void loop() {
     displayImageFromBin(file);
     file.close();
 
-    delay(7000); // Wait 7 seconds before showing next image
+    delay(7000);  // Wait 7 seconds before showing next image
   }
 }
 
@@ -53,7 +53,7 @@ void displayImageFromBin(File& file) {
   uint16_t height = file.read() | (file.read() << 8);
 
   int size = (width * height) / 8;
-  uint8_t* buffer = (uint8_t*) malloc(size);
+  uint8_t* buffer = (uint8_t*)malloc(size);
   if (!buffer) {
     Serial.println("Memory alloc failed!");
     return;
@@ -71,3 +71,4 @@ void displayImageFromBin(File& file) {
 
   free(buffer);
 }
+

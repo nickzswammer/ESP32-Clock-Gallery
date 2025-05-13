@@ -1,8 +1,11 @@
 #include <WiFi.h>
 #include <WebServer.h>
 
+#define LED1pin 13
+#define LED2pin 32
+
 /* Put your SSID & Password */
-const char* ssid = "JACK_SUCKS";  // Enter SSID here
+const char* ssid = "HELEN_SUCKS";  // Enter SSID here
 const char* password = "12345678";  //Enter Password here
 
 /* Put IP Address details */
@@ -12,10 +15,8 @@ IPAddress subnet(255,255,255,0);
 
 WebServer server(80);
 
-uint8_t LED1pin = 13;
 bool LED1status = LOW;
 
-uint8_t LED2pin = 32;
 bool LED2status = LOW;
 
 void setup() {
