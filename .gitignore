@@ -1,13 +1,18 @@
-/Backend/image_processor/.venv/
+# Ignore virtual environment
+**/.venv/
 
-/Backend/image_processor/processed_files
-/Backend/image_processor/uploaded_files
+# Ignore image processing folders
+/Backend/image_processor/processed_files/
+/Backend/image_processor/uploaded_files/
 
-.DS_Store
-Thumbs.db
+/Backend/image_processor/debug_dithered.png
 
-__pycache__/
+# Ignore these files everywhere (recursive)
+**/.DS_Store
+**/Thumbs.db
+**/__pycache__/
 
-.vscode/
+# Ignore these folders and editor configs everywhere
+**/.vscode/
+**/.idea/
 *.swp
-.idea/
