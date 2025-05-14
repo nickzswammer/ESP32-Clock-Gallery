@@ -1,3 +1,5 @@
+# Run Using "flask --app app run --debug"
+
 from flask import Flask, render_template, url_for, request, redirect, send_from_directory
 import os
 from PIL import Image
