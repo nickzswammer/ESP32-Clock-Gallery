@@ -29,7 +29,7 @@ bool   SD_present = false; //Controls if the SD card is present or not
 
 void setup(void)
 {  
-  Serial.begin(9600);
+  Serial.begin(115200);
   WiFi.softAP("Clock Gallery Access", "moomin123"); //Network and password for the access point genereted by ESP32
   
   if (!MDNS.begin(SERVERNAME)) 
@@ -82,19 +82,25 @@ void SD_dir()
       Serial.println(server.arg(0));
   
       String Order = server.arg(0);
-      Serial.println(Order);
+
       
       if (Order.indexOf("download_")>=0)
       {
         Order.remove(0,9);
+        Order = String(DIRECTORY) + "/" + Order;
+
         SD_file_download(Order);
+        Serial.print("'download_' Order (server.arg(0)): ");
         Serial.println(Order);
       }
   
       if ((server.arg(0)).indexOf("delete_")>=0)
       {
         Order.remove(0,7);
+        Order = String(DIRECTORY) + "/" + Order;
+
         SD_file_delete(Order);
+        Serial.print("'delete_' Order (server.arg(0)): ");
         Serial.println(Order);
       }
     }
@@ -194,7 +200,7 @@ void SD_file_download(String filename)
 {
   if (SD_present) 
   { 
-    File download = SD.open("/"+filename);
+    File download = SD.open(filename);
     if (download) 
     {
       server.sendHeader("Content-Type", "text/text");
@@ -217,6 +223,7 @@ void handleFileUpload()
   {
     String filename = uploadfile.filename;
     if(!filename.startsWith("/")) filename = "/"+filename;
+    filename = String(DIRECTORY) + filename;
     Serial.print("Upload File Name: "); Serial.println(filename);
     SD.remove(filename);                         //Remove a previous version, otherwise data is appended the file again
     UploadFile = SD.open(filename, FILE_WRITE);  //Open the file for writing in SD (create it, if doesn't exist)
@@ -251,12 +258,18 @@ void handleFileUpload()
 //Delete a file from the SD, it is called in void SD_dir()
 void SD_file_delete(String filename) 
 { 
+  Serial.print("Filename: ");
+  Serial.println(filename);
+  
   if (SD_present) { 
+    Serial.println("SD Is Present");
     SendHTML_Header();
-    File dataFile = SD.open("/"+filename, FILE_READ); //Now read data from SD Card 
+    File dataFile = SD.open(filename, FILE_READ); //Now read data from SD Card 
     if (dataFile)
     {
-      if (SD.remove("/"+filename)) {
+      Serial.println("Datafile Is Present");
+
+      if (SD.remove(filename)) {
         Serial.println(F("File deleted successfully"));
         webpage += "<h3>File '"+filename+"' has been erased</h3>"; 
         webpage += F("<a href='/'>[Back]</a><br><br>");

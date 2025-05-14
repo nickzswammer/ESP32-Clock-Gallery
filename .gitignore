@@ -1,5 +1,8 @@
 /Backend/image_processor/.venv/
 
+/Backend/image_processor/processed_files
+/Backend/image_processor/uploaded_files
+
 .DS_Store
 Thumbs.db
 

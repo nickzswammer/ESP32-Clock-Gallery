@@ -23,6 +23,9 @@ def success():
         f.save(save_path)
         return redirect(url_for('process_image', filename=f.filename))
 
+from PIL import Image, ImageOps
+import os
+
 @app.route('/process/<filename>')
 def process_image(filename):
     WIDTH = 400
@@ -32,38 +35,52 @@ def process_image(filename):
     bin_filename = os.path.splitext(filename)[0] + '.bin'
     output_path = os.path.join(PROCESSED_FOLDER, bin_filename)
 
-    img = Image.open(input_path).convert('1')
-
+    # Load and scale image
+    img = Image.open(input_path).convert('L')  # Convert to grayscale first
     img.thumbnail((WIDTH, HEIGHT), Image.LANCZOS)
-    
-    canvas = Image.new('1', (WIDTH, HEIGHT), 1)
+
+    # Create white canvas and center image
+    canvas = Image.new('L', (WIDTH, HEIGHT), 255)
     paste_x = (WIDTH - img.width) // 2
     paste_y = (HEIGHT - img.height) // 2
     canvas.paste(img, (paste_x, paste_y))
 
+    # Apply dithering to simulate GIMP behavior
+    dithered = canvas.convert('1', dither=Image.FLOYDSTEINBERG)
+    dithered.save("debug_dithered.png")
+
     with open(output_path, 'wb') as f:
+        # Write width and height in little-endian (2 bytes each)
+        f.write(WIDTH.to_bytes(2, byteorder='little'))
+        f.write(HEIGHT.to_bytes(2, byteorder='little'))
+
+        # Pack bits row-major, LSB-first, with no per-row padding
+        byte = 0
+        bit_count = 0
+
         for y in range(HEIGHT):
-            byte = 0
-            bit_count = 0
             for x in range(WIDTH):
-                pixel = canvas.getpixel((x, y))
-                bit = 0 if pixel == 0 else 1
-                byte = (byte << 1) | bit
+                pixel = dithered.getpixel((x, y))
+                bit = 1 if pixel == 0 else 0  # 1 = black, 0 = white
+                byte |= (bit << bit_count)   # LSB-first
                 bit_count += 1
+
                 if bit_count == 8:
                     f.write(bytes([byte]))
                     byte = 0
                     bit_count = 0
-            if bit_count > 0:
-                byte <<= (8 - bit_count)
-                f.write(bytes([byte]))
 
-    # Provide download link to user
+        # Pad final byte if needed
+        if bit_count > 0:
+            byte |= (0xFF << bit_count) & 0xFF  # Fill unused bits with 1s (white)
+            f.write(bytes([byte]))
+
+
     return f"""
-    <h2>Conversion complete!</h2>
-    <p>Download your .bin file:</p>
+    <h2>Conversion complete with dithering!</h2>
     <a href="{url_for('download_file', filename=bin_filename)}" download>Download {bin_filename}</a>
     """
+
 
 @app.route('/download/<filename>')
 def download_file(filename):
