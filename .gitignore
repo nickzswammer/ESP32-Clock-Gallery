@@ -1,1 +1,10 @@
 /Backend/image_processor/.venv/
+
+.DS_Store
+Thumbs.db
+
+__pycache__/
+
+.vscode/
+*.swp
+.idea/
