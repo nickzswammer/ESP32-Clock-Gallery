@@ -11,7 +11,6 @@
 
 #include <WiFi.h>              //Built-in
 #include <ESP32WebServer.h>    //https://github.com/Pedroalbuquerque/ESP32WebServer download and place in your Libraries folder
-#include <ESPmDNS.h>
 
 #include "CSS.h" //Includes headers of the web and de style file
 #include <SD.h> 
@@ -31,12 +30,6 @@ void setup(void)
 {  
   Serial.begin(115200);
   WiFi.softAP("Clock Gallery Access", "moomin123"); //Network and password for the access point genereted by ESP32
-  
-  if (!MDNS.begin(SERVERNAME)) 
-  {          
-    Serial.println(F("Error setting up MDNS responder!")); 
-    ESP.restart(); 
-  } 
 
   Serial.print(F("Initializing SD card..."));
   
