@@ -28,11 +28,73 @@ void append_page_header() {
   webpage += F("</style></head><body><h1>Clock Gallery Directory</h1>");
   webpage += F("<ul>");
   webpage += F("<li><a href='/'>Current Files</a></li>"); //Menu bar with commands
-  webpage += F("<li><a href='/upload'>Upload an Image</a></li>"); 
+  webpage += F("<li><a href='/upload'>Upload a .bin File</a></li>"); 
   webpage += F("</ul>");
 }
 //Saves repeating many lines of code for HTML page footers
 void append_page_footer()
 { 
   webpage += F("</body></html>");
+}
+
+/* ===================== HTML HELPER FUNCTIONS ===================== */
+
+//SendHTML_Header
+void SendHTML_Header()
+{
+  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate"); 
+  server.sendHeader("Pragma", "no-cache"); 
+  server.sendHeader("Expires", "-1"); 
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN); 
+  server.send(200, "text/html", ""); //Empty content inhibits Content-length header so we have to close the socket ourselves. 
+  append_page_header();
+  server.sendContent(webpage);
+  webpage = "";
+}
+
+//SendHTML_Content
+void SendHTML_Content()
+{
+  server.sendContent(webpage);
+  webpage = "";
+}
+
+//SendHTML_Stop
+void SendHTML_Stop()
+{
+  server.sendContent("");
+  server.client().stop(); //Stop is needed because no content length was sent
+}
+
+//ReportSDNotPresent
+void ReportSDNotPresent()
+{
+  SendHTML_Header();
+  webpage += F("<h3>No SD Card present</h3>"); 
+  webpage += F("<a href='/'>[Back]</a><br><br>");
+  append_page_footer();
+  SendHTML_Content();
+  SendHTML_Stop();
+}
+
+//ReportFileNotPresent
+void ReportFileNotPresent(String target)
+{
+  SendHTML_Header();
+  webpage += F("<h3>File does not exist</h3>"); 
+  webpage += F("<a href='/"); webpage += target + "'>[Back]</a><br><br>";
+  append_page_footer();
+  SendHTML_Content();
+  SendHTML_Stop();
+}
+
+//ReportCouldNotCreateFile
+void ReportCouldNotCreateFile(String target)
+{
+  SendHTML_Header();
+  webpage += F("<h3>Could Not Create Uploaded File (write-protected?)</h3>"); 
+  webpage += F("<a href='/"); webpage += target + "'>[Back]</a><br><br>";
+  append_page_footer();
+  SendHTML_Content();
+  SendHTML_Stop();
 }

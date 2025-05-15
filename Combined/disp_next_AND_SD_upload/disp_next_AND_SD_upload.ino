@@ -28,7 +28,7 @@
 #include "SPI.h"
 
 // CSS file for webpage
-#include "CSS.h" //Includes headers of the web and de style file
+#include "WebHelpers.h" //Includes headers of the web and de style file
 
 // pin definitions
 #define CS_SD 2
@@ -156,7 +156,7 @@ void SD_dir()
 {
   if (SD_present) 
   {
-    //Action acording to post, dowload or delete, by MC 2022
+    //Action according to post, download or delete, by MC 2022
     if (server.args() > 0 ) //Arguments were received, ignored if there are not arguments
     { 
       Serial.println(server.arg(0));
@@ -364,67 +364,6 @@ void SD_file_delete(String filename)
   } else ReportSDNotPresent();
 } 
 
-/* ===================== HTML HELPER FUNCTIONS ===================== */
-
-//SendHTML_Header
-void SendHTML_Header()
-{
-  server.sendHeader("Cache-Control", "no-cache, no-store, must-revalidate"); 
-  server.sendHeader("Pragma", "no-cache"); 
-  server.sendHeader("Expires", "-1"); 
-  server.setContentLength(CONTENT_LENGTH_UNKNOWN); 
-  server.send(200, "text/html", ""); //Empty content inhibits Content-length header so we have to close the socket ourselves. 
-  append_page_header();
-  server.sendContent(webpage);
-  webpage = "";
-}
-
-//SendHTML_Content
-void SendHTML_Content()
-{
-  server.sendContent(webpage);
-  webpage = "";
-}
-
-//SendHTML_Stop
-void SendHTML_Stop()
-{
-  server.sendContent("");
-  server.client().stop(); //Stop is needed because no content length was sent
-}
-
-//ReportSDNotPresent
-void ReportSDNotPresent()
-{
-  SendHTML_Header();
-  webpage += F("<h3>No SD Card present</h3>"); 
-  webpage += F("<a href='/'>[Back]</a><br><br>");
-  append_page_footer();
-  SendHTML_Content();
-  SendHTML_Stop();
-}
-
-//ReportFileNotPresent
-void ReportFileNotPresent(String target)
-{
-  SendHTML_Header();
-  webpage += F("<h3>File does not exist</h3>"); 
-  webpage += F("<a href='/"); webpage += target + "'>[Back]</a><br><br>";
-  append_page_footer();
-  SendHTML_Content();
-  SendHTML_Stop();
-}
-
-//ReportCouldNotCreateFile
-void ReportCouldNotCreateFile(String target)
-{
-  SendHTML_Header();
-  webpage += F("<h3>Could Not Create Uploaded File (write-protected?)</h3>"); 
-  webpage += F("<a href='/"); webpage += target + "'>[Back]</a><br><br>";
-  append_page_footer();
-  SendHTML_Content();
-  SendHTML_Stop();
-}
 
 //File size conversion
 String file_size(int bytes)
