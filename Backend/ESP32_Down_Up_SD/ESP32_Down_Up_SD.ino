@@ -23,7 +23,7 @@ ESP32WebServer server(80);
 #define SD_pin 2 //2 in my case
 #define DIRECTORY "/bin_images"
 
-bool   SD_present = false; //Controls if the SD card is present or not
+bool SD_present = false; //Controls if the SD card is present or not
 
 /*********  SETUP  **********/
 
