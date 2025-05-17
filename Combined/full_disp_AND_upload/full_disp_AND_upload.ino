@@ -1,11 +1,11 @@
 /*
   Project Title: Audrey Clock Gallery
-  File Name:     disp_next_AND_SD_upload.ino
+  File Name:     full_disp_AND_upload.ino
   Author:        Nicholas Zhang
-  Date:          May 14, 2025
+  Date:          May 16, 2025
 
   Description:
-    Uses pushbutton to select image from SD card directory and scroll through, as well as enable WiFi uploading
+    3 Pushbuttons and gives user interface to select files to display, as well as enabling SD Wifi Uploading
 
   Notes:
     N/A
@@ -13,7 +13,6 @@
 
 /* ========================== LIBRARIES & FILES ========================== */
 
-// GxEPD2 400x300 Board Selection
 #include <GxEPD2_BW.h>
 #include "GxEPD2_display_selection_new_style.h"
 
@@ -33,12 +32,15 @@
 // pin definitions
 #define CS_SD 2
 #define BUTTON_1 26
-#define DIRECTORY "/bin_images"
-#define DNS_PORT 53
-#define MAX_FILES 20
+#define BUTTON_2 25
+#define BUTTON_3 33
 
-/* ========================== VARIBLES ========================== */
-// create webserver object (listens for incoming connections on specified port HTTP requests)
+#define MAX_FILES 20 // maybe change for later? 
+#define DIRECTORY "/bin_images"
+#define MAX_FILENAME_LENGTH 200
+#define DNS_PORT 53
+
+/* ========================== VARIABLES ========================== */
 ESP32WebServer server(80);
 
 const byte DNS_PORT_NUM = 53;
@@ -46,39 +48,31 @@ DNSServer dnsServer;
 
 // button states
 int curr_button_1_state = 1; // high means no press
-int prev_button_1_state = 0; // high means no press
+int prev_button_1_state = 0;
+int curr_button_2_state = 1;
+int prev_button_2_state = 0; 
+int curr_button_3_state = 1; 
+int prev_button_3_state = 0; 
 
+int displaying_files = 0;
+
+// File Stores & SD
 bool SD_present = false; //Controls if the SD card is present or not
-
-// File Stores
 File root;
 File current_file;
-String selected_file_name = "";
+String current_file_name = "";
+int current_file_names_index = 0;
 int file_count = MAX_FILES;
-String file_names[MAX_FILES];
 
-/* ========================== FUNCTION DECLARATION ========================== */
-void update_file_names(fs::FS &fs, const char * dirname);
-void select_next_file();
-void SD_dir();
-void File_Upload();
-void printDirectory(const char * dirname, uint8_t levels);
-void SD_file_download(String filename);
-void handleFileUpload();
-void SD_file_delete(String filename);
-void SendHTML_Header();
-void SendHTML_Content();
-void SendHTML_Stop();
-void ReportSDNotPresent();
-void ReportFileNotPresent(String target);
-void ReportCouldNotCreateFile(String target);
-String file_size(int bytes);
+String file_names[MAX_FILES];
 
 /* ========================== SETUP ========================== */
 
 void setup() {
   Serial.begin(115200);
   display.init(115200);
+  display.setRotation(0);
+  display.setFullWindow();
 
   /* ===================== WIFI BLOCK ===================== */
   WiFi.softAP("Clock Gallery Access", "moomin123"); //Network and password for the access point genereted by ESP32
@@ -86,6 +80,10 @@ void setup() {
   Serial.println("IP address: " + WiFi.softAPIP().toString());
 
   dnsServer.start(DNS_PORT_NUM, "*", WiFi.softAPIP());
+
+  pinMode(BUTTON_1, INPUT_PULLUP);
+  pinMode(BUTTON_2, INPUT_PULLUP);
+  pinMode(BUTTON_3, INPUT_PULLUP);
 
   /* ===================== SERVER COMMANDS ===================== */
   server.on("/",         SD_dir);
@@ -102,6 +100,7 @@ void setup() {
   server.begin();
   
   Serial.println("HTTP server started");
+  
 
   /* ===================== INIT SD CARD ===================== */
   pinMode(BUTTON_1, INPUT_PULLUP); // button for going to next file in microSD
@@ -128,32 +127,115 @@ void setup() {
     return;
   }
 
+  current_file = root.openNextFile();
+  current_file_name = current_file.name();
+  file_names[0] = current_file_name;
+
+  //list_dir(SD, DIRECTORY);
+
 }
 
-/* ========================== LOOP ========================== */
+void handle_button_1(){
+    Serial.printf("Printing Current File: %s[%d]\n", current_file_name, current_file_names_index);
+    String current_file_location = String(DIRECTORY) + "/" + file_names[current_file_names_index];
+    current_file = SD.open(current_file_location, FILE_READ);
+    displayImageFromBin(current_file);
+}
+
+void display_files(int show_curr_file)
+{
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);  // clear the display
+    display.setTextColor(GxEPD_BLACK);
+    display.setFont();  // default font
+    display.setTextSize(4);
+    display.setCursor(60, 20);  // starting position (x,y)
+    display.print("Select Files");
+
+    int cursor_position_y = 80;
+    display.setTextSize(1);
+
+    for (int i = 0; i < file_count; i++)
+    {
+      char buffer[MAX_FILENAME_LENGTH + 10];
+      sprintf(buffer, "%d: %s", i+1, file_names[i].c_str());
+
+      display.setCursor(60, cursor_position_y);
+      display.print(buffer);
+
+      cursor_position_y += 20;
+
+      if (show_curr_file)
+      {
+        display.setTextSize(1);
+        display.setCursor(120, 290);  // starting position (x,y)
+        display.print("Selected File: #" + String(current_file_names_index+1) + " " + String(file_names[current_file_names_index]));
+      }
+    }
+  } while (display.nextPage());
+}
 
 void loop() {
+  
+  // button states
+  curr_button_1_state = digitalRead(BUTTON_1);
+  curr_button_2_state = digitalRead(BUTTON_2);
+  curr_button_3_state = digitalRead(BUTTON_3);
+
   server.handleClient(); //Listen for client connections
 
-  curr_button_1_state = digitalRead(BUTTON_1);
-
-  // display image
+  current_file_name = file_names[current_file_names_index];
 
   if(curr_button_1_state == LOW && prev_button_1_state == HIGH)
   {
-    update_file_names(SD, "/bin_images");
-    select_next_file();
-    displayImageFromBin(current_file);
-    Serial.println("Displaying: " + selected_file_name);
+    handle_button_1();
   }
+
+  if(curr_button_2_state == LOW && prev_button_2_state == HIGH)
+  {
+    list_dir(SD, DIRECTORY);
+
+    Serial.println("");
+
+    if(file_count == 0)
+    {
+      Serial.println("No files found");
+      return;
+    }
+    current_file_names_index++;
+
+    if(current_file_names_index > file_count - 1)
+      current_file_names_index = 0;
+
+    Serial.printf("Selected File [%d]: ", current_file_names_index);
+    Serial.println(file_names[current_file_names_index]);
+    
+    display_files(1); // 1 to indicate to show files
+  }
+
+  if(curr_button_3_state == LOW && prev_button_3_state == HIGH)
+  {
+    Serial.println("Button 3 Pressed");
+    displaying_files = !displaying_files;
+    if(displaying_files)
+    {
+      Serial.println("Display Changing ...");
+      display_files(0);
+    }
+    else {
+      handle_button_1();
+    }
+  }
+
   prev_button_1_state = curr_button_1_state;
+  prev_button_2_state = curr_button_2_state;
+  prev_button_3_state = curr_button_3_state;
 
 }
 
 /* ========================== FUNCTION DEFINITION ========================== */
-
 /* ===================== SERVER FUNCTIONS ===================== */
-
 //Initial page of the server web, list directory and give you the chance of deleting and uploading
 void SD_dir()
 {
@@ -272,8 +354,6 @@ void printDirectory(const char * dirname, uint8_t levels)
     i++;
   }
   file.close();
-
- 
 }
 
 //Download a file from the SD, it is called in void SD_dir()
@@ -367,7 +447,6 @@ void SD_file_delete(String filename)
   } else ReportSDNotPresent();
 } 
 
-
 //File size conversion
 String file_size(int bytes)
 {
@@ -379,58 +458,24 @@ String file_size(int bytes)
   return fsize;
 }
 
-/* ===================== SD FUNCTIONS ===================== */
+/* ===================== DISPLAY FUNCTIONS ===================== */
 
-// function to list directories and files (only top level)
-void select_next_file() {
-
-  // close file if open already
-  if (current_file)
-  {
-    current_file.close();
-  }
-
-  // move to next file
-  current_file = root.openNextFile();
-
-  // If we reach the end of the folder, rewind
-  if (!current_file) {
-    root.rewindDirectory();
-    current_file = root.openNextFile();
-  }
-
-  // Skip non-bin files
-  while (current_file && !String(current_file.name()).endsWith(".bin")) {
-    current_file = root.openNextFile();
-
-    // if reaches end while in loop, go back to the beginning of directory
-    if (!current_file) {
-      root.rewindDirectory();
-      current_file = root.openNextFile();
-    }
-  }
-
-  // output purposes
-  if (current_file) {
-    selected_file_name = current_file.name();
-    Serial.print("\nSelected file: ");
-    Serial.println(selected_file_name);
-  }
-}
-
-void update_file_names(fs::FS &fs, const char * dirname) {
-  Serial.printf("Listing directory (non-recursive): %s\n", dirname);
+void list_dir(fs::FS &fs, const char * dirname) 
+{
+  Serial.printf("\nListing directory (non-recursive): %s\n", dirname);
 
   File list_root = fs.open(dirname);
-  if (!list_root || !list_root.isDirectory()) {
+  if (!list_root || !list_root.isDirectory()) 
+  {
     Serial.println("Failed to open directory");
     return;
   }
 
-  int i = 0;
+  int i = 0; // iterate through the file_names
 
   File file = list_root.openNextFile();
-  while (file && i < file_count) {
+  while (file && i < file_count) 
+  {
     if (!file.isDirectory()) 
     {
       file_names[i] = String(file.name());
@@ -446,9 +491,8 @@ void update_file_names(fs::FS &fs, const char * dirname) {
   Serial.printf("\nStored %d filenames in file_names[]\n", i);
 }
 
-/* ===================== DISPLAY FUNCTIONS ===================== */
-
-void displayImageFromBin(File& file) {
+void displayImageFromBin(File& file) 
+{
   uint16_t width = file.read() | (file.read() << 8);
   uint16_t height = file.read() | (file.read() << 8);
 
@@ -466,8 +510,6 @@ void displayImageFromBin(File& file) {
 
   file.read(buffer, size);
 
-  display.setRotation(0);
-  display.setFullWindow();
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
@@ -538,4 +580,3 @@ void ReportCouldNotCreateFile(String target)
   SendHTML_Content();
   SendHTML_Stop();
 }
-
