@@ -80,18 +80,13 @@ void setup() {
     server.send(302);
   });
 
-
   server.begin();
-  
   Serial.println("HTTP server started");
 
   /* ===================== INIT SD CARD ===================== */
-  pinMode(BUTTON_1, INPUT_PULLUP); // button for going to next file in microSD
-
   Serial.print(F("Initializing SD card... "));
   
   //see if the card is present and can be initialised.
-  //Note: Using the ESP32 and SD_Card readers requires a 1K to 4K7 pull-up to 3v3 on the MISO line, otherwise may not work
   if (!SD.begin(CS_SD))
   { 
     Serial.println(F("Card failed or not present, no SD Card data logging possible..."));
@@ -114,42 +109,9 @@ void setup() {
   app.currentFileName = app.currentFile.name();
   app.fileNames[0] = app.currentFileName;
 
-  //list_dir(SD, DIRECTORY);
+  list_dir(SD, DIRECTORY);
 
-}
-
-void display_files(int show_curr_file)
-{
-  display.firstPage();
-  do {
-    display.fillScreen(GxEPD_WHITE);  // clear the display
-    display.setTextColor(GxEPD_BLACK);
-    display.setFont();  // default font
-    display.setTextSize(4);
-    display.setCursor(60, 20);  // starting position (x,y)
-    display.print("Select Files");
-
-    int cursor_position_y = 80;
-    display.setTextSize(1);
-
-    for (int i = 0; i < app.fileCount; i++)
-    {
-      char buffer[MAX_FILENAME_LENGTH + 10];
-      sprintf(buffer, "%d: %s", i+1, app.fileNames[i].c_str()); // loads filename + index into buffer
-
-      display.setCursor(60, cursor_position_y);
-      display.print(buffer);
-
-      cursor_position_y += 20;
-
-      if (show_curr_file)
-      {
-        display.setTextSize(1);
-        display.setCursor(120, 290);  // starting position (x,y)
-        display.print("Selected File: #" + String(app.currentFileIndex+1) + " " + String(app.fileNames[app.currentFileIndex]));
-      }
-    }
-  } while (display.nextPage());
+  Serial.println("SETUP EXECUTED!");
 }
 
 void loop() {
@@ -190,7 +152,7 @@ void loop() {
     Serial.printf("Selected File [%d]: ", app.currentFileIndex);
     Serial.println(app.fileNames[app.currentFileIndex]);
     
-    display_files(1); // 1 to indicate to show files
+    display_files(); // 1 to indicate to show files
   }
 
   // select next file
@@ -213,7 +175,7 @@ void loop() {
     Serial.printf("Selected File [%d]: ", app.currentFileIndex);
     Serial.println(app.fileNames[app.currentFileIndex]);
     
-    display_files(1); // 1 to indicate to show files
+    display_files();
   }
 
   // show files
@@ -223,15 +185,13 @@ void loop() {
     if(app.displayingFiles)
     {
       Serial.println("Showing All Files ...");
-      display_files(0);
+      display_files();
     }
     else {
       handle_button_1();
     }
   }
-
   app.resetButtons();
-
 }
 
 /* ========================== FUNCTION DEFINITION ========================== */
@@ -242,7 +202,6 @@ void handle_button_1(){
     app.currentFile = SD.open(current_file_location, FILE_READ);
     displayImageFromBin(app.currentFile);
 }
-
 
 //Initial page of the server web, list directory and give you the chance of deleting and uploading
 void SD_dir()
@@ -467,10 +426,40 @@ String file_size(int bytes)
 }
 
 /* ===================== DISPLAY FUNCTIONS ===================== */
+void display_files()
+{
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);  // clear the display
+    display.setTextColor(GxEPD_BLACK);
+    display.setFont();  // default font
+    display.setTextSize(4);
+    display.setCursor(60, 20);  // starting position (x,y)
+    display.print("Select Files");
+
+    int cursor_position_y = 80;
+    display.setTextSize(1);
+
+    for (int i = 0; i < app.fileCount; i++)
+    {
+      char buffer[MAX_FILENAME_LENGTH + 10];
+      sprintf(buffer, "%d: %s", i+1, app.fileNames[i].c_str()); // loads filename + index into buffer
+
+      display.setCursor(60, cursor_position_y);
+      display.print(buffer);
+
+      cursor_position_y += 20;
+
+      display.setTextSize(1);
+      display.setCursor(120, 290);  // starting position (x,y)
+      display.print("Selected File: #" + String(app.currentFileIndex+1) + " " + String(app.fileNames[app.currentFileIndex]));
+    }
+  } while (display.nextPage());
+}
 
 void list_dir(fs::FS &fs, const char * dirname) 
 {
-  Serial.printf("\nListing directory (non-recursive): %s\n", dirname);
+  //Serial.printf("\nListing directory (non-recursive): %s\n", dirname);
 
   File list_root = fs.open(dirname);
   if (!list_root || !list_root.isDirectory()) 
@@ -487,7 +476,7 @@ void list_dir(fs::FS &fs, const char * dirname)
     if (!file.isDirectory()) 
     {
       app.fileNames[i] = String(file.name());
-      Serial.printf("FILE: %s\tSIZE: %d\n", file.name(), file.size());
+      //Serial.printf("FILE: %s\tSIZE: %d\n", file.name(), file.size());
     }
 
     file = list_root.openNextFile();
