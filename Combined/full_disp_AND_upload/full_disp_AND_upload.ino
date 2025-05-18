@@ -5,10 +5,7 @@
   Date:          May 16, 2025
 
   Description:
-    3 Pushbuttons and gives user interface to select files to display, as well as enabling SD Wifi Uploading
-
-  Notes:
-    N/A
+  43 Pushbuttons and gives user interface to select files to display, as well as enabling SD Wifi Uploading
 */
 
 /* ========================== LIBRARIES & FILES ========================== */
@@ -26,9 +23,10 @@
 #include "SD.h"
 #include "SPI.h"
 
-// CSS file for webpage
-#include "WebHelpers.h" //Includes headers of the web and de style file
+// Local Headers
+#include "WebHelpers.h" //Includes headers of the web and style file
 #include "AppState.h"
+#include "secrets.h"
 
 // pin definitions
 #define CS_SD 2
@@ -58,7 +56,7 @@ void setup() {
   display.setFullWindow();
 
   /* ===================== WIFI BLOCK ===================== */
-  WiFi.softAP("Clock Gallery Access", "moomin123"); //Network and password for the access point genereted by ESP32
+  WiFi.softAP(WIFI_SSID, WIFI_PASSWORD); //Network and password for the access point gemerated by ESP32
   Serial.println("Access Point started");
   Serial.println("IP address: " + WiFi.softAPIP().toString());
 
@@ -256,19 +254,6 @@ void SD_dir()
     SendHTML_Content();
     SendHTML_Stop();   //Stop is needed because no content length was sent
   } else ReportSDNotPresent();
-}
-
-//Upload a file to the SD
-void File_Upload()
-{
-  append_page_header();
-  webpage += F("<h3>Select File to Upload</h3>"); 
-  webpage += F("<FORM action='/fupload' method='post' enctype='multipart/form-data'>");
-  webpage += F("<input class='buttons' style='width:25%' type='file' name='fupload' id = 'fupload' value=''>");
-  webpage += F("<button class='buttons' style='width:10%' type='submit'>Upload File</button><br><br>");
-  webpage += F("<a href='/'>[Back]</a><br><br>");
-  append_page_footer();
-  server.send(200, "text/html",webpage);
 }
 
 //Prints the directory, it is called in void SD_dir() 

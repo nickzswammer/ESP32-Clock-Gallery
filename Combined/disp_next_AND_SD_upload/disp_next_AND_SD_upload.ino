@@ -57,23 +57,6 @@ String selected_file_name = "";
 int file_count = MAX_FILES;
 String file_names[MAX_FILES];
 
-/* ========================== FUNCTION DECLARATION ========================== */
-void update_file_names(fs::FS &fs, const char * dirname);
-void select_next_file();
-void SD_dir();
-void File_Upload();
-void printDirectory(const char * dirname, uint8_t levels);
-void SD_file_download(String filename);
-void handleFileUpload();
-void SD_file_delete(String filename);
-void SendHTML_Header();
-void SendHTML_Content();
-void SendHTML_Stop();
-void ReportSDNotPresent();
-void ReportFileNotPresent(String target);
-void ReportCouldNotCreateFile(String target);
-String file_size(int bytes);
-
 /* ========================== SETUP ========================== */
 
 void setup() {
@@ -272,8 +255,6 @@ void printDirectory(const char * dirname, uint8_t levels)
     i++;
   }
   file.close();
-
- 
 }
 
 //Download a file from the SD, it is called in void SD_dir()

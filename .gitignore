@@ -16,3 +16,6 @@
 **/.vscode/
 **/.idea/
 *.swp
+
+# Secrets
+/Combined/full_disp_AND_upload/secrets.h

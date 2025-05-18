@@ -4,6 +4,19 @@
 String webpage = ""; //String to save the html cod
 extern ESP32WebServer server;
 
+//Upload a file to the SD
+void File_Upload()
+{
+  append_page_header();
+  webpage += F("<h3>Select File to Upload</h3>"); 
+  webpage += F("<FORM action='/fupload' method='post' enctype='multipart/form-data'>");
+  webpage += F("<input class='buttons' style='width:25%' type='file' name='fupload' id = 'fupload' value=''>");
+  webpage += F("<button class='buttons' style='width:10%' type='submit'>Upload File</button><br><br>");
+  webpage += F("<a href='/'>[Back]</a><br><br>");
+  append_page_footer();
+  server.send(200, "text/html",webpage);
+}
+
 void append_page_header() {
   webpage  = F("<!DOCTYPE html><html>");
   webpage += F("<head>");
