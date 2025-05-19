@@ -105,7 +105,7 @@ void setup() {
 
   app.currentFile = app.root.openNextFile();
   app.currentFileName = app.currentFile.name();
-  app.fileNames[0] = app.currentFileName;
+  app.fileNames[0][0] = app.currentFileName;
 
   list_dir(SD, DIRECTORY);
 
@@ -122,7 +122,9 @@ void loop() {
 
   server.handleClient(); //Listen for client connections
 
-  app.currentFileName = app.fileNames[app.currentFileIndex];
+  app.currentPage = app.currentFileIndex / MAX_FILES_PER_PAGE;
+  app.currentPageIndex = app.currentFileIndex % MAX_FILES_PER_PAGE;
+  app.currentFileName = app.fileNames[app.currentPage][app.currentPageFile];
 
   // display
   if(app.wasPressed(app.currButton1, app.prevButton1))
@@ -142,15 +144,27 @@ void loop() {
       Serial.println("No files found");
       return;
     }
-    app.currentFileIndex--;
 
-    if(app.currentFileIndex < 0)
-      app.currentFileIndex = app.fileCount - 1;
+    if(app.fileMode)
+    {
+      app.currentFileIndex--;
 
-    Serial.printf("Selected File [%d]: ", app.currentFileIndex);
-    Serial.println(app.fileNames[app.currentFileIndex]);
-    
-    display_files(); // 1 to indicate to show files
+      if(app.currentFileIndex < 0)
+        app.currentFileIndex = app.fileCount - 1;
+
+      Serial.printf("Selected File Number: #[%d]: ", app.currentFileIndex);
+    }
+    else
+    {
+      app.currentFileIndex = 0;
+      app.currentPage--;
+      if(app.currentPage < 0)
+        app.currentPage = app.totalPages - 1;
+
+      Serial.printf("Selected Page Number: #[%d]: ", app.currentPage);
+    }
+    Serial.println(app.fileNames[app.currentPage][app.currentPageFile]);
+    display_files();
   }
 
   // select next file
@@ -165,29 +179,41 @@ void loop() {
       Serial.println("No files found");
       return;
     }
-    app.currentFileIndex++;
+    if(app.fileMode)
+    {
+      app.currentFileIndex++;
 
-    if(app.currentFileIndex > app.fileCount - 1)
+      if(app.currentFileIndex > app.fileCount - 1)
+        app.currentFileIndex = 0;
+
+      Serial.printf("Selected File Number: #[%d]: ", app.currentFileIndex);
+    }
+    else
+    {
       app.currentFileIndex = 0;
+      app.currentPage++;
+      if(app.currentPage > app.totalPages - 1)
+        app.currentPage = 0;
 
-    Serial.printf("Selected File [%d]: ", app.currentFileIndex);
-    Serial.println(app.fileNames[app.currentFileIndex]);
-    
+      Serial.printf("Selected Page Number: #[%d]: ", app.currentPage);
+    }
+    Serial.println(app.fileNames[app.currentPage][app.currentPageFile]);
+
     display_files();
   }
 
   // show files
   if(app.wasPressed(app.currButton4, app.prevButton4))
   {
-    app.displayingFiles = !app.displayingFiles;
-    if(app.displayingFiles)
+    app.fileMode = !app.fileMode;
+    if(app.fileMode)
     {
-      Serial.println("Showing All Files ...");
-      display_files();
+      Serial.println("Changed to File Select Mode");
     }
     else {
-      handle_button_1();
+      Serial.println("Changed to Page Select Mode");
     }
+    display_files();
   }
   app.resetButtons();
 }
@@ -195,8 +221,8 @@ void loop() {
 /* ========================== FUNCTION DEFINITION ========================== */
 /* ===================== SERVER FUNCTIONS ===================== */
 void handle_button_1(){
-    Serial.printf("Printing Current File: %s[%d]\n", app.currentFileName, app.currentFileIndex);
-    String current_file_location = String(DIRECTORY) + "/" + app.fileNames[app.currentFileIndex];
+    Serial.printf("Printing Current File: %s [%d]\n", app.currentFileName, app.currentFileIndex);
+    String current_file_location = String(DIRECTORY) + "/" + app.fileNames[app.currentPage][app.currentPageFile];
     app.currentFile = SD.open(current_file_location, FILE_READ);
     displayImageFromBin(app.currentFile);
 }
@@ -425,10 +451,13 @@ void display_files()
     int cursor_position_y = 80;
     display.setTextSize(1);
 
-    for (int i = 0; i < app.fileCount; i++)
+    int start = app.currentPage * MAX_FILES_PER_PAGE;
+    int end = min(start + MAX_FILES_PER_PAGE, app.fileCount);
+
+    for (int i = start; i < end; i++)
     {
       char buffer[MAX_FILENAME_LENGTH + 10];
-      sprintf(buffer, "%d: %s", i+1, app.fileNames[i].c_str()); // loads filename + index into buffer
+      sprintf(buffer, "%d: %s", i+1, app.fileNames[i / MAX_FILES_PER_PAGE][i % MAX_FILES_PER_PAGE].c_str()); // loads filename + index into buffer
 
       display.setCursor(60, cursor_position_y);
       display.print(buffer);
@@ -436,8 +465,12 @@ void display_files()
       cursor_position_y += 20;
 
       display.setTextSize(1);
-      display.setCursor(120, 290);  // starting position (x,y)
-      display.print("Selected File: #" + String(app.currentFileIndex+1) + " " + String(app.fileNames[app.currentFileIndex]));
+      display.setCursor(60, 290);  // starting position (x,y)
+      display.print("Selected File: #" + String(app.currentFileIndex+1) + " " + String(app.fileNames[app.currentPage][app.currentPageFile]));
+
+          // Optional: Show page info
+      display.setCursor(250, 290);
+      display.print("Page " + String(app.currentPage + 1) + "/" + String(app.totalPages));
     }
   } while (display.nextPage());
 }
@@ -453,21 +486,32 @@ void list_dir(fs::FS &fs, const char * dirname)
     return;
   }
 
-  int i = 0; // iterate through the app.fileNames
+  int page_index = 0; // iterate through the pages
+  int file_index = 0; // iterate thru files on one page
+  int loop_file_count = 0; // file count
 
   File file = list_root.openNextFile();
-  while (file && i < app.fileCount) 
+  while (file && loop_file_count < app.fileCount) 
   {
     if (!file.isDirectory()) 
     {
-      app.fileNames[i] = String(file.name());
+      if (loop_file_count != 0 && loop_file_count % MAX_FILES_PER_PAGE == 0)
+      {
+        page_index++;
+        file_index = 0;
+      }
+      else if (loop_file_count != 0)
+      {
+        file_index++;
+      }
+      app.fileNames[page_index][file_index] = String(file.name());
       //Serial.printf("FILE: %s\tSIZE: %d\n", file.name(), file.size());
     }
 
     file = list_root.openNextFile();
-    i++;
+    loop_file_count++;
   }
-  app.fileCount = i;
+  app.fileCount = loop_file_count;
   list_root.close();
 
   Serial.printf("\nStored %d filenames in app.fileNames[]\n", i);

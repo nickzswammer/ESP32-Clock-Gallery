@@ -5,6 +5,9 @@
 #include <FS.h>
 
 #define MAX_FILES 20
+#define MAX_FILES_PER_PAGE 5
+#define MAX_PAGES MAX_FILES/MAX_FILES_PER_PAGE // 20 / 5 = 4
+
 #define MAX_FILENAME_LENGTH 200
 
 struct AppState {
@@ -13,9 +16,10 @@ struct AppState {
     int currButton2 = 1, prevButton2 = 0;
     int currButton3 = 1, prevButton3 = 0;
     int currButton4 = 1, prevButton4 = 0;
+    int currButton5 = 1, prevButton5 = 0;
   
     // Display control
-    bool displayingFiles = false;
+    bool fileMode = false; // file select mode or page increment mode
   
     // SD state
     bool sdPresent = false;
@@ -25,8 +29,12 @@ struct AppState {
   
     // File indexing
     int currentFileIndex = 0;
+    int currentPage = 0;
+    int currentPageFile;
     int fileCount = MAX_FILES;
-    String fileNames[MAX_FILES];
+    String fileNames[MAX_PAGES][MAX_FILES_PER_PAGE]; // fileNames[4][5]
+    int totalPages = (fileCount + MAX_FILES_PER_PAGE - 1) / MAX_FILES_PER_PAGE;
+
   
     void resetButtons() {
       prevButton1 = currButton1;
