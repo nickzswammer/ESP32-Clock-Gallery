@@ -14,8 +14,8 @@
 #include "GxEPD2_display_selection_new_style.h"
 
 // Wifi Libraries
-#include <WiFi.h>              //Built-in
-#include <ESP32WebServer.h>    //https://github.com/Pedroalbuquerque/ESP32WebServer download and place in your Libraries folder
+#include <WiFi.h>            //Built-in
+#include <ESP32WebServer.h>  //https://github.com/Pedroalbuquerque/ESP32WebServer download and place in your Libraries folder
 #include <DNSServer.h>
 
 // SD Libraries
@@ -24,7 +24,7 @@
 #include "SPI.h"
 
 // Local Headers
-#include "WebHelpers.h" //Includes headers of the web and style file
+#include "WebHelpers.h"  //Includes headers of the web and style file
 #include "AppState.h"
 #include "secrets.h"
 
@@ -56,7 +56,7 @@ void setup() {
   display.setFullWindow();
 
   /* ===================== WIFI BLOCK ===================== */
-  WiFi.softAP(WIFI_SSID, WIFI_PASSWORD); //Network and password for the access point gemerated by ESP32
+  WiFi.softAP(WIFI_SSID, WIFI_PASSWORD);  //Network and password for the access point gemerated by ESP32
   Serial.println("Access Point started");
   Serial.println("IP address: " + WiFi.softAPIP().toString());
 
@@ -68,9 +68,11 @@ void setup() {
   pinMode(BUTTON_4, INPUT_PULLUP);
 
   /* ===================== SERVER COMMANDS ===================== */
-  server.on("/",         SD_dir);
-  server.on("/upload",   File_Upload);
+  server.on("/", SD_dir);
+  server.on("/upload", File_Upload);
   server.on("/fupload",  HTTP_POST,[](){ server.send(200);}, handleFileUpload);
+  //server.on("/timeUpload", Time_Upload);
+  //server.on("/timeUploadProcess", HTTP_POST, handleTimeUpload);
 
   // Catch-all route
   server.onNotFound([]() {
@@ -83,17 +85,14 @@ void setup() {
 
   /* ===================== INIT SD CARD ===================== */
   Serial.print(F("Initializing SD card... "));
-  
+
   //see if the card is present and can be initialised.
-  if (!SD.begin(CS_SD))
-  { 
+  if (!SD.begin(CS_SD)) {
     Serial.println(F("Card failed or not present, no SD Card data logging possible..."));
-    app.sdPresent = false; 
-  } 
-  else
-  {
+    app.sdPresent = false;
+  } else {
     Serial.println(F("\nCard initialised. File access enabled!"));
-    app.sdPresent = true; 
+    app.sdPresent = true;
   }
 
   // starts off directory inside /bin_images
@@ -104,8 +103,8 @@ void setup() {
   }
 
   app.currentFile = app.root.openNextFile();
-  app.currentFileName = app.currentFile.name();
-  app.fileNames[0][0] = app.currentFileName;
+  app.currentFileName = getCurrentFileName();
+  app.fileNames[0][0] = getCurrentFileName();
 
   list_dir(SD, DIRECTORY);
 
@@ -113,104 +112,88 @@ void setup() {
 }
 
 void loop() {
-  
   // button states
   app.currButton1 = digitalRead(BUTTON_1);
   app.currButton2 = digitalRead(BUTTON_2);
   app.currButton3 = digitalRead(BUTTON_3);
   app.currButton4 = digitalRead(BUTTON_4);
 
-  server.handleClient(); //Listen for client connections
+  server.handleClient();  //Listen for client connections
 
-  app.currentPage = app.currentFileIndex / MAX_FILES_PER_PAGE;
-  app.currentPageIndex = app.currentFileIndex % MAX_FILES_PER_PAGE;
-  app.currentFileName = app.fileNames[app.currentPage][app.currentPageFile];
+  app.currentFileName = getCurrentFileName();
 
   // display
-  if(app.wasPressed(app.currButton1, app.prevButton1))
-  {
+  if (app.wasPressed(app.currButton1, app.prevButton1)) {
     handle_button_1();
   }
 
-    // select prev file
-  if(app.wasPressed(app.currButton2, app.prevButton2))
-  {
+  // select prev file
+  if (app.wasPressed(app.currButton2, app.prevButton2)) {
     list_dir(SD, DIRECTORY);
 
     Serial.println("");
 
-    if(app.fileCount == 0)
-    {
+    if (app.fileCount == 0) {
       Serial.println("No files found");
       return;
     }
 
-    if(app.fileMode)
-    {
+    if (app.fileMode) {
       app.currentFileIndex--;
 
-      if(app.currentFileIndex < 0)
+      if (app.currentFileIndex < 0)
         app.currentFileIndex = app.fileCount - 1;
 
-      Serial.printf("Selected File Number: #[%d]: ", app.currentFileIndex);
-    }
-    else
-    {
-      app.currentFileIndex = 0;
-      app.currentPage--;
-      if(app.currentPage < 0)
-        app.currentPage = app.totalPages - 1;
+      Serial.printf("Selected File Index: [%d]: ", app.currentFileIndex);
+    } else {
+      // PAGE SELECT MODE: move to previous page
+      int currentPage = getCurrentPage();
+      currentPage = (currentPage - 1 + app.totalPages) % app.totalPages;
 
-      Serial.printf("Selected Page Number: #[%d]: ", app.currentPage);
+      app.currentFileIndex = currentPage * MAX_FILES_PER_PAGE;
+
+      Serial.printf("Selected Page Number: #%d\n", currentPage + 1);
     }
-    Serial.println(app.fileNames[app.currentPage][app.currentPageFile]);
+    Serial.println(String(app.currentFileIndex + 1) + " " + getCurrentFileName());
     display_files();
   }
 
   // select next file
-  if(app.wasPressed(app.currButton3, app.prevButton3))
-  {
+  if (app.wasPressed(app.currButton3, app.prevButton3)) {
     list_dir(SD, DIRECTORY);
 
     Serial.println("");
 
-    if(app.fileCount == 0)
-    {
+    if (app.fileCount == 0) {
       Serial.println("No files found");
       return;
     }
-    if(app.fileMode)
-    {
+    if (app.fileMode) {
       app.currentFileIndex++;
 
-      if(app.currentFileIndex > app.fileCount - 1)
+      if (app.currentFileIndex > app.fileCount - 1)
         app.currentFileIndex = 0;
 
       Serial.printf("Selected File Number: #[%d]: ", app.currentFileIndex);
-    }
-    else
-    {
-      app.currentFileIndex = 0;
-      app.currentPage++;
-      if(app.currentPage > app.totalPages - 1)
-        app.currentPage = 0;
+    } else {
+      // PAGE SELECT MODE: move to next page
+      int currentPage = getCurrentPage();
+      currentPage = (currentPage + 1 + app.totalPages) % app.totalPages;
+      app.currentFileIndex = currentPage * MAX_FILES_PER_PAGE;
 
-      Serial.printf("Selected Page Number: #[%d]: ", app.currentPage);
+      Serial.printf("Selected Page Number: #%d\n", currentPage + 1);
     }
-    Serial.println(app.fileNames[app.currentPage][app.currentPageFile]);
+    Serial.println(String(app.currentFileIndex + 1) + " " + getCurrentFileName());
 
     display_files();
   }
 
   // show files
-  if(app.wasPressed(app.currButton4, app.prevButton4))
-  {
+  if (app.wasPressed(app.currButton4, app.prevButton4)) {
     app.fileMode = !app.fileMode;
-    if(app.fileMode)
-    {
+    if (app.fileMode) {
       Serial.println("Changed to File Select Mode");
-    }
-    else {
+    } else {
       Serial.println("Changed to Page Select Mode");
     }
     display_files();
@@ -220,39 +203,35 @@ void loop() {
 
 /* ========================== FUNCTION DEFINITION ========================== */
 /* ===================== SERVER FUNCTIONS ===================== */
-void handle_button_1(){
-    Serial.printf("Printing Current File: %s [%d]\n", app.currentFileName, app.currentFileIndex);
-    String current_file_location = String(DIRECTORY) + "/" + app.fileNames[app.currentPage][app.currentPageFile];
-    app.currentFile = SD.open(current_file_location, FILE_READ);
-    displayImageFromBin(app.currentFile);
+void handle_button_1() {
+  Serial.printf("Printing Current File: %s [%d]\n", getCurrentFileName(), app.currentFileIndex);
+  String current_file_location = String(DIRECTORY) + "/" + getCurrentFileName();
+  app.currentFile = SD.open(current_file_location, FILE_READ);
+  displayImageFromBin(app.currentFile);
 }
 
 //Initial page of the server web, list directory and give you the chance of deleting and uploading
-void SD_dir()
-{
-  if (app.sdPresent) 
-  {
+void SD_dir() {
+  if (app.sdPresent) {
     //Action according to post, download or delete, by MC 2022
-    if (server.args() > 0 ) //Arguments were received, ignored if there are not arguments
-    { 
+    if (server.args() > 0)  //Arguments were received, ignored if there are not arguments
+    {
       Serial.println(server.arg(0));
-  
+
       String Order = server.arg(0);
 
-      
-      if (Order.indexOf("download_")>=0)
-      {
-        Order.remove(0,9);
+
+      if (Order.indexOf("download_") >= 0) {
+        Order.remove(0, 9);
         Order = String(DIRECTORY) + "/" + Order;
 
         SD_file_download(Order);
         Serial.print("'download_' Order (server.arg(0)): ");
         Serial.println(Order);
       }
-  
-      if ((server.arg(0)).indexOf("delete_")>=0)
-      {
-        Order.remove(0,7);
+
+      if ((server.arg(0)).indexOf("delete_") >= 0) {
+        Order.remove(0, 7);
         Order = String(DIRECTORY) + "/" + Order;
 
         SD_file_delete(Order);
@@ -264,69 +243,67 @@ void SD_dir()
 
     if (root_server) {
       root_server.rewindDirectory();
-      SendHTML_Header();    
+      SendHTML_Header();
       webpage += F("<table align='center'>");
-      webpage += F("<tr><th>Name/Type</th><th style='width:20%'>Type File/Dir</th><th>File Size</th></tr>");
-      printDirectory(DIRECTORY,0);
+      webpage += F("<tr><th>Name/Type</th><th>Type File/Dir</th><th>File Size</th><th>Download</th><th>Delete</th></tr>");
+      printDirectory(DIRECTORY, 0);
       webpage += F("</table>");
       SendHTML_Content();
-    }
-    else 
-    {
+    } else {
       SendHTML_Header();
       webpage += F("<h3>No Files Found</h3>");
     }
     append_page_footer();
     SendHTML_Content();
-    SendHTML_Stop();   //Stop is needed because no content length was sent
+    SendHTML_Stop();  //Stop is needed because no content length was sent
   } else ReportSDNotPresent();
 }
 
-//Prints the directory, it is called in void SD_dir() 
-void printDirectory(const char * dirname, uint8_t levels)
-{
+//Prints the directory, it is called in void SD_dir()
+void printDirectory(const char* dirname, uint8_t levels) {
   File root_server = SD.open(dirname);
 
-  if(!root_server){
+  if (!root_server) {
     return;
   }
-  if(!root_server.isDirectory()){
+  if (!root_server.isDirectory()) {
     return;
   }
   File server_file = root_server.openNextFile();
 
   int i = 0;
-  while(server_file){
+  while (server_file) {
     if (webpage.length() > 1000) {
       SendHTML_Content();
     }
-    if(server_file.isDirectory()){
-      webpage += "<tr><td>"+String(server_file.isDirectory()?"Dir":"File")+"</td><td>"+String(server_file.name())+"</td><td></td></tr>";
-      printDirectory(server_file.name(), levels-1);
-    }
-    else
-    {
-      webpage += "<tr><td>"+String(server_file.name())+"</td>";
-      webpage += "<td>"+String(server_file.isDirectory()?"Dir":"File")+"</td>";
+    if (server_file.isDirectory()) {
+      webpage += "<tr><td>" + String(server_file.isDirectory() ? "Dir" : "File") + "</td><td>" + String(server_file.name()) + "</td><td></td></tr>";
+      printDirectory(server_file.name(), levels - 1);
+    } else {
+      webpage += "<tr><td>" + String(server_file.name()) + "</td>";
+      webpage += "<td>" + String(server_file.isDirectory() ? "Dir" : "File") + "</td>";
       int bytes = server_file.size();
       String fsize = "";
-      if (bytes < 1024)                     fsize = String(bytes)+" B";
-      else if(bytes < (1024 * 1024))        fsize = String(bytes/1024.0,3)+" KB";
-      else if(bytes < (1024 * 1024 * 1024)) fsize = String(bytes/1024.0/1024.0,3)+" MB";
-      else                                  fsize = String(bytes/1024.0/1024.0/1024.0,3)+" GB";
-      webpage += "<td>"+fsize+"</td>";
+      if (bytes < 1024) fsize = String(bytes) + " B";
+      else if (bytes < (1024 * 1024)) fsize = String(bytes / 1024.0, 3) + " KB";
+      else if (bytes < (1024 * 1024 * 1024)) fsize = String(bytes / 1024.0 / 1024.0, 3) + " MB";
+      else fsize = String(bytes / 1024.0 / 1024.0 / 1024.0, 3) + " GB";
+      webpage += "<td>" + fsize + "</td>";
       webpage += "<td>";
-      webpage += F("<FORM action='/' method='post'>"); 
-      webpage += F("<button type='submit' name='download'"); 
-      webpage += F("' value='"); webpage +="download_"+String(server_file.name()); webpage +=F("'>Download</button>");
+      webpage += F("<FORM action='/' method='post'>");
+      webpage += F("<button type='submit' name='download'");
+      webpage += F("' value='");
+      webpage += "download_" + String(server_file.name());
+      webpage += F("'>Download</button>");
       webpage += "</td>";
       webpage += "<td>";
-      webpage += F("<FORM action='/' method='post'>"); 
-      webpage += F("<button type='submit' name='delete'"); 
-      webpage += F("' value='"); webpage +="delete_"+String(server_file.name()); webpage +=F("'>Delete</button>");
+      webpage += F("<FORM action='/' method='post'>");
+      webpage += F("<button type='submit' name='delete'");
+      webpage += F("' value='");
+      webpage += "delete_" + String(server_file.name());
+      webpage += F("'>Delete</button>");
       webpage += "</td>";
       webpage += "</tr>";
-
     }
     server_file = root_server.openNextFile();
     i++;
@@ -335,110 +312,123 @@ void printDirectory(const char * dirname, uint8_t levels)
 }
 
 //Download a file from the SD, it is called in void SD_dir()
-void SD_file_download(String filename)
-{
-  if (app.sdPresent) 
-  { 
+void SD_file_download(String filename) {
+  if (app.sdPresent) {
     File download = SD.open(filename);
-    if (download) 
-    {
+    if (download) {
       server.sendHeader("Content-Type", "text/text");
-      server.sendHeader("Content-Disposition", "attachment; filename="+filename);
+      server.sendHeader("Content-Disposition", "attachment; filename=" + filename);
       server.sendHeader("Connection", "close");
       server.streamFile(download, "application/octet-stream");
       download.close();
-    } else ReportFileNotPresent("download"); 
+    } else ReportFileNotPresent("download");
   } else ReportSDNotPresent();
 }
 
 //Handles the file upload a file to the SD
 File UploadFile;
 //Upload a new file to the Filing system
-void handleFileUpload()
-{ 
-  HTTPUpload& uploadfile = server.upload(); //See https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WebServer/srcv
-                                            //For further information on 'status' structure, there are other reasons such as a failed transfer that could be used
-  if(uploadfile.status == UPLOAD_FILE_START)
-  {
+void handleFileUpload() {
+  HTTPUpload& uploadfile = server.upload();  //See https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WebServer/srcv
+                                             //For further information on 'status' structure, there are other reasons such as a failed transfer that could be used
+  if (uploadfile.status == UPLOAD_FILE_START) {
     String filename = uploadfile.filename;
-    if(!filename.startsWith("/")) filename = "/"+filename;
+    if (!filename.startsWith("/")) filename = "/" + filename;
     filename = String(DIRECTORY) + filename;
-    Serial.print("Upload File Name: "); Serial.println(filename);
+    Serial.print("Upload File Name: ");
+    Serial.println(filename);
     SD.remove(filename);                         //Remove a previous version, otherwise data is appended the file again
     UploadFile = SD.open(filename, FILE_WRITE);  //Open the file for writing in SD (create it, if doesn't exist)
     filename = String();
-  }
-  else if (uploadfile.status == UPLOAD_FILE_WRITE)
-  {
-    if(UploadFile) UploadFile.write(uploadfile.buf, uploadfile.currentSize); // Write the received bytes to the file
-  } 
-  else if (uploadfile.status == UPLOAD_FILE_END)
-  {
-    if(UploadFile)          //If the file was successfully created
-    {                                    
-      UploadFile.close();   //Close the file again
-      Serial.print("Upload Size: "); Serial.println(uploadfile.totalSize);
+  } else if (uploadfile.status == UPLOAD_FILE_WRITE) {
+    if (UploadFile) UploadFile.write(uploadfile.buf, uploadfile.currentSize);  // Write the received bytes to the file
+  } else if (uploadfile.status == UPLOAD_FILE_END) {
+    if (UploadFile)  //If the file was successfully created
+    {
+      UploadFile.close();  //Close the file again
+      Serial.print("Upload Size: ");
+      Serial.println(uploadfile.totalSize);
       webpage = "";
       append_page_header();
-      webpage += F("<h3>File was successfully uploaded</h3>"); 
-      webpage += F("<h2>Uploaded File Name: "); webpage += uploadfile.filename+"</h2>";
-      webpage += F("<h2>File Size: "); webpage += file_size(uploadfile.totalSize) + "</h2><br><br>"; 
+      webpage += F("<h3>File was successfully uploaded</h3>");
+      webpage += F("<h2>Uploaded File Name: ");
+      webpage += uploadfile.filename + "</h2>";
+      webpage += F("<h2>File Size: ");
+      webpage += file_size(uploadfile.totalSize) + "</h2><br><br>";
       webpage += F("<a href='/'>[Back]</a><br><br>");
       append_page_footer();
-      server.send(200,"text/html",webpage);
-    } 
-    else
-    {
+      server.send(200, "text/html", webpage);
+    } else {
       ReportCouldNotCreateFile("upload");
     }
   }
 }
 
+String uploadedTimeString;
+
+void handleTimeUpload() {
+  if (server.hasArg("timeUploadProcess")) {
+    uploadedTimeString = server.arg("timeUploadProcess");
+    Serial.print("Uploaded time string: ");
+    Serial.println(uploadedTimeString);
+    webpage = "";
+    append_page_header();
+    webpage += F("<h2>Time was successfully uploaded</h2>");
+    webpage += F("<h3>Time Recieved: ");
+    webpage += uploadedTimeString + "</h3>";
+    webpage += F("<a href='/'>[Back]</a><br><br>");
+    append_page_footer();
+    server.send(200, "text/html", webpage);
+  } else {
+    webpage = "";
+    append_page_header();
+    webpage += F("<h3>Error: Time was not uploaded</h3>");
+    webpage += F("<a href='/'>[Back]</a><br><br>");
+    append_page_footer();
+    server.send(400, "text/html", webpage);
+  }
+}
+
+
 //Delete a file from the SD, it is called in void SD_dir()
-void SD_file_delete(String filename) 
-{ 
+void SD_file_delete(String filename) {
   Serial.print("Filename: ");
   Serial.println(filename);
-  
-  if (app.sdPresent) { 
+
+  if (app.sdPresent) {
     Serial.println("SD Is Present");
     SendHTML_Header();
-    File dataFile = SD.open(filename, FILE_READ); //Now read data from SD Card 
-    if (dataFile)
-    {
+    File dataFile = SD.open(filename, FILE_READ);  //Now read data from SD Card
+    if (dataFile) {
       Serial.println("Datafile Is Present");
 
       if (SD.remove(filename)) {
         Serial.println(F("File deleted successfully"));
-        webpage += "<h3>File '"+filename+"' has been erased</h3>"; 
+        webpage += "<h3>File '" + filename + "' has been erased</h3>";
         webpage += F("<a href='/'>[Back]</a><br><br>");
-      }
-      else
-      { 
+      } else {
         webpage += F("<h3>File was not deleted - error</h3>");
         webpage += F("<a href='/'>[Back]</a><br><br>");
       }
     } else ReportFileNotPresent("delete");
-    append_page_footer(); 
+    append_page_footer();
     SendHTML_Content();
     SendHTML_Stop();
   } else ReportSDNotPresent();
-} 
+}
 
 //File size conversion
-String file_size(int bytes)
-{
+String file_size(int bytes) {
   String fsize = "";
-  if (bytes < 1024)                 fsize = String(bytes)+" B";
-  else if(bytes < (1024*1024))      fsize = String(bytes/1024.0,3)+" KB";
-  else if(bytes < (1024*1024*1024)) fsize = String(bytes/1024.0/1024.0,3)+" MB";
-  else                              fsize = String(bytes/1024.0/1024.0/1024.0,3)+" GB";
+  if (bytes < 1024) fsize = String(bytes) + " B";
+  else if (bytes < (1024 * 1024)) fsize = String(bytes / 1024.0, 3) + " KB";
+  else if (bytes < (1024 * 1024 * 1024)) fsize = String(bytes / 1024.0 / 1024.0, 3) + " MB";
+  else fsize = String(bytes / 1024.0 / 1024.0 / 1024.0, 3) + " GB";
   return fsize;
 }
 
 /* ===================== DISPLAY FUNCTIONS ===================== */
-void display_files()
-{
+void display_files() {
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);  // clear the display
@@ -451,74 +441,70 @@ void display_files()
     int cursor_position_y = 80;
     display.setTextSize(1);
 
-    int start = app.currentPage * MAX_FILES_PER_PAGE;
+    int start = getCurrentPage() * MAX_FILES_PER_PAGE;
     int end = min(start + MAX_FILES_PER_PAGE, app.fileCount);
 
-    for (int i = start; i < end; i++)
-    {
+    for (int i = start; i < end; i++) {
       char buffer[MAX_FILENAME_LENGTH + 10];
-      sprintf(buffer, "%d: %s", i+1, app.fileNames[i / MAX_FILES_PER_PAGE][i % MAX_FILES_PER_PAGE].c_str()); // loads filename + index into buffer
+      sprintf(buffer, "%d: %s", i + 1, app.fileNames[i / MAX_FILES_PER_PAGE][i % MAX_FILES_PER_PAGE].c_str());  // loads filename + index into buffer
 
+      display.setTextSize(2);
       display.setCursor(60, cursor_position_y);
       display.print(buffer);
 
-      cursor_position_y += 20;
+      cursor_position_y += 30;
 
       display.setTextSize(1);
-      display.setCursor(60, 290);  // starting position (x,y)
-      display.print("Selected File: #" + String(app.currentFileIndex+1) + " " + String(app.fileNames[app.currentPage][app.currentPageFile]));
+      display.setCursor(10, 290);  // starting position (x,y)
+      display.print("Selected File: #" + String(app.currentFileIndex + 1) + " " + getCurrentFileName());
 
-          // Optional: Show page info
+      // Optional: Show page info
       display.setCursor(250, 290);
-      display.print("Page " + String(app.currentPage + 1) + "/" + String(app.totalPages));
+      display.print("Page " + String(getCurrentPage() + 1) + "/" + String(app.totalPages));
+
+      display.setCursor(350, 290);
+      display.print("Mode " + String(app.fileMode ? "F" : "P"));
     }
   } while (display.nextPage());
 }
 
-void list_dir(fs::FS &fs, const char * dirname) 
-{
-  //Serial.printf("\nListing directory (non-recursive): %s\n", dirname);
+void list_dir(fs::FS& fs, const char* dirname) {
+  Serial.printf("\nListing directory (non-recursive): %s\n", dirname);
 
   File list_root = fs.open(dirname);
-  if (!list_root || !list_root.isDirectory()) 
-  {
+  if (!list_root || !list_root.isDirectory()) {
     Serial.println("Failed to open directory");
     return;
   }
 
-  int page_index = 0; // iterate through the pages
-  int file_index = 0; // iterate thru files on one page
-  int loop_file_count = 0; // file count
+  int page_index = 0;       // iterate through the pages
+  int file_index = 0;       // iterate thru files on one page
+  int loop_file_count = 0;  // file count
 
   File file = list_root.openNextFile();
-  while (file && loop_file_count < app.fileCount) 
-  {
-    if (!file.isDirectory()) 
-    {
-      if (loop_file_count != 0 && loop_file_count % MAX_FILES_PER_PAGE == 0)
-      {
+  while (file && loop_file_count < app.fileCount) {
+    if (!file.isDirectory()) {
+      if (loop_file_count != 0 && loop_file_count % MAX_FILES_PER_PAGE == 0) {
         page_index++;
         file_index = 0;
-      }
-      else if (loop_file_count != 0)
-      {
+      } else if (loop_file_count != 0) {
         file_index++;
       }
       app.fileNames[page_index][file_index] = String(file.name());
-      //Serial.printf("FILE: %s\tSIZE: %d\n", file.name(), file.size());
+      Serial.printf("FILE: %s\tSIZE: %d\n", file.name(), file.size());
     }
 
     file = list_root.openNextFile();
     loop_file_count++;
   }
   app.fileCount = loop_file_count;
+  app.totalPages = (app.fileCount + MAX_FILES_PER_PAGE - 1) / MAX_FILES_PER_PAGE;
   list_root.close();
 
-  Serial.printf("\nStored %d filenames in app.fileNames[]\n", i);
+  Serial.printf("\nStored %d filenames in app.fileNames[]\n", loop_file_count);
 }
 
-void displayImageFromBin(File& file) 
-{
+void displayImageFromBin(File& file) {
   uint16_t width = file.read() | (file.read() << 8);
   uint16_t height = file.read() | (file.read() << 8);
 
@@ -530,7 +516,8 @@ void displayImageFromBin(File& file)
   uint8_t* buffer = (uint8_t*)malloc(size);
   if (!buffer) {
     Serial.println("Memory alloc failed!");
-    while(true);
+    while (true)
+      ;
     return;
   }
 
@@ -543,4 +530,18 @@ void displayImageFromBin(File& file)
   } while (display.nextPage());
 
   free(buffer);
+}
+
+int getCurrentPage() {
+  return app.currentFileIndex / MAX_FILES_PER_PAGE;
+}
+
+int getCurrentPageFile() {
+  return app.currentFileIndex % MAX_FILES_PER_PAGE;
+}
+
+String getCurrentFileName() {
+  int page = getCurrentPage();
+  int file = getCurrentPageFile();
+  return app.fileNames[page][file];
 }

@@ -33,7 +33,7 @@ struct AppState {
     int currentPageFile;
     int fileCount = MAX_FILES;
     String fileNames[MAX_PAGES][MAX_FILES_PER_PAGE]; // fileNames[4][5]
-    int totalPages = (fileCount + MAX_FILES_PER_PAGE - 1) / MAX_FILES_PER_PAGE;
+    int totalPages = 0;
 
   
     void resetButtons() {

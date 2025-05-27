@@ -14,5 +14,6 @@ void ReportSDNotPresent();
 void ReportFileNotPresent(String target);
 void ReportCouldNotCreateFile(String target);
 void File_Upload();
+void Time_Upload();
 
 #endif
