@@ -16,12 +16,14 @@
 // Wifi Libraries
 #include <WiFi.h>            //Built-in
 #include <ESP32WebServer.h>  //https://github.com/Pedroalbuquerque/ESP32WebServer download and place in your Libraries folder
-#include <DNSServer.h>
 
 // SD Libraries
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
+
+// RTC Library Include
+#include "RTClib.h"
 
 // Local Headers
 #include "WebHelpers.h"  //Includes headers of the web and style file
@@ -36,16 +38,17 @@
 #define BUTTON_4 32
 
 #define DIRECTORY "/bin_images"
-#define DNS_PORT 53
 
 AppState app;
 
 /* ========================== VARIABLES ========================== */
 
 ESP32WebServer server(80);
+RTC_DS3231 rtc;
 
-const byte DNS_PORT_NUM = 53;
-DNSServer dnsServer;
+String formattedTimeArray[5] = {"2025-05-27", "Tuesday", "11", "59", "AM"};
+
+char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 
 /* ========================== SETUP ========================== */
 
@@ -60,8 +63,6 @@ void setup() {
   Serial.println("Access Point started");
   Serial.println("IP address: " + WiFi.softAPIP().toString());
 
-  dnsServer.start(DNS_PORT_NUM, "*", WiFi.softAPIP());
-
   pinMode(BUTTON_1, INPUT_PULLUP);
   pinMode(BUTTON_2, INPUT_PULLUP);
   pinMode(BUTTON_3, INPUT_PULLUP);
@@ -70,9 +71,13 @@ void setup() {
   /* ===================== SERVER COMMANDS ===================== */
   server.on("/", SD_dir);
   server.on("/upload", File_Upload);
-  server.on("/fupload",  HTTP_POST,[](){ server.send(200);}, handleFileUpload);
-  //server.on("/timeUpload", Time_Upload);
-  //server.on("/timeUploadProcess", HTTP_POST, handleTimeUpload);
+  server.on(
+    "/fupload", HTTP_POST, []() {
+      server.send(200);
+    },
+    handleFileUpload);
+  server.on("/timeUpload", Time_Upload);
+  server.on("/timeUploadProcess", HTTP_POST, handleTimeUpload);
 
   // Catch-all route
   server.onNotFound([]() {
@@ -108,6 +113,22 @@ void setup() {
 
   list_dir(SD, DIRECTORY);
 
+  // RTC Module
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+  }
+
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, let's set the time!");
+    // When time needs to be set on a new device, or after a power loss, the
+    // following line sets the RTC to the date & time this sketch was compiled
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    // This line sets the RTC with an explicit date & time, for example to set
+    // January 21, 2014 at 3am you would call:
+    //rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
+  }
+
   Serial.println("SETUP EXECUTED!");
 }
 
@@ -118,8 +139,16 @@ void loop() {
   app.currButton3 = digitalRead(BUTTON_3);
   app.currButton4 = digitalRead(BUTTON_4);
 
-  server.handleClient();  //Listen for client connections
+  // Get the current time from the RTC
+  DateTime now = rtc.now();
 
+  Serial.printf("\nCurrent Formatted Time: %s\n", formatTime(now).c_str());
+  Serial.printf("\nCurrent Time: %s:%s %s\n", formattedTimeArray[2], formattedTimeArray[3], formattedTimeArray[4]);
+
+  //Listen for client connections
+  server.handleClient();
+
+  // set file name
   app.currentFileName = getCurrentFileName();
 
   // display
@@ -219,7 +248,6 @@ void SD_dir() {
       Serial.println(server.arg(0));
 
       String Order = server.arg(0);
-
 
       if (Order.indexOf("download_") >= 0) {
         Order.remove(0, 9);
@@ -367,10 +395,24 @@ void handleFileUpload() {
 String uploadedTimeString;
 
 void handleTimeUpload() {
+  
   if (server.hasArg("timeUploadProcess")) {
     uploadedTimeString = server.arg("timeUploadProcess");
+
     Serial.print("Uploaded time string: ");
     Serial.println(uploadedTimeString);
+
+    // Expected format: "2025-05-27T21:45" or "2025-05-27T21:45:00"
+    int y = uploadedTimeString.substring(0, 4).toInt();
+    int m = uploadedTimeString.substring(5, 7).toInt();
+    int d = uploadedTimeString.substring(8, 10).toInt();
+    int h = uploadedTimeString.substring(11, 13).toInt();
+    int min = uploadedTimeString.substring(14, 16).toInt();
+    int s = (uploadedTimeString.length() >= 19) ? uploadedTimeString.substring(17, 19).toInt() : 0;
+
+    rtc.adjust(DateTime(y, m, d, h, min, s));
+
+    // web response
     webpage = "";
     append_page_header();
     webpage += F("<h2>Time was successfully uploaded</h2>");
@@ -544,4 +586,28 @@ String getCurrentFileName() {
   int page = getCurrentPage();
   int file = getCurrentPageFile();
   return app.fileNames[page][file];
+}
+
+String formatTime(DateTime now){
+  // Getting each time field in individual variables
+  // And adding a leading zero when needed;
+  String yearStr = String(now.year(), DEC);
+  String monthStr = (now.month() < 10 ? "0" : "") + String(now.month(), DEC);
+  String dayStr = (now.day() < 10 ? "0" : "") + String(now.day(), DEC);
+  String hourStr = (now.hour() < 10 ? "0" : "") + String(now.hour(), DEC); 
+  String minuteStr = (now.minute() < 10 ? "0" : "") + String(now.minute(), DEC);
+  String secondStr = (now.second() < 10 ? "0" : "") + String(now.second(), DEC);
+  String dayOfWeek = daysOfTheWeek[now.dayOfTheWeek()];
+
+  // Complete time string
+  String formattedTime = dayOfWeek + ", " + yearStr + "-" + monthStr + "-" + dayStr + " " + hourStr + ":" + minuteStr + ":" + secondStr;
+
+  formattedTimeArray[0] = yearStr + "-" + monthStr + "-" + dayStr;
+  formattedTimeArray[1] = dayOfWeek;
+  formattedTimeArray[2] = (now.hour() == 0) ? "12" : (now.hour() > 12) ? String(now.hour() - 12, DEC) : String(now.hour(), DEC);
+  formattedTimeArray[3] = minuteStr;
+  formattedTimeArray[4] = (now.hour() >= 12 && now.hour() != 0) ? "PM" : "AM";
+
+  // Print the complete formatted time
+  return formattedTime;
 }

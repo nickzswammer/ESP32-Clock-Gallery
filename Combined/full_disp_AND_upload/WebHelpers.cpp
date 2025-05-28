@@ -23,7 +23,7 @@ void Time_Upload()
   append_page_header();
   webpage += F("<h3>Enter time (YYYY-MM-DD HH:MM:SS)</h3>");
   webpage += F("<FORM action='/timeUploadProcess' method='post'>");
-  webpage += F("<input class='buttons' type='text' name='timeUploadProcess' id = 'timeUploadProcess'><br><br>");
+  webpage += F("<input class='buttons' type='datetime-local' name='timeUploadProcess' id ='timeUploadProcess' required><br><br>");
   webpage += F("<button class='buttons' type='submit'>Set Time</button>");
   webpage += F("</form>");
   webpage += F("<a href='/'>[Back]</a><br><br>");
