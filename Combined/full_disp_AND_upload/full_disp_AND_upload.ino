@@ -5,13 +5,16 @@
   Date:          May 16, 2025
 
   Description:
-  43 Pushbuttons and gives user interface to select files to display, as well as enabling SD Wifi Uploading
+  4 Pushbuttons and gives user interface to select files to display and clock, as well as enabling SD Wifi Uploading
 */
 
 /* ========================== LIBRARIES & FILES ========================== */
 
 #include <GxEPD2_BW.h>
 #include "GxEPD2_display_selection_new_style.h"
+#include <Fonts/FreeSansBold24pt7b.h>
+#include <Fonts/FreeSansBold12pt7b.h>
+#include <Fonts/FreeSans9pt7b.h>
 
 // Wifi Libraries
 #include <WiFi.h>            //Built-in
@@ -25,6 +28,9 @@
 // RTC Library Include
 #include "RTClib.h"
 
+// Long Button Press
+#include "OneButton.h"
+
 // Local Headers
 #include "WebHelpers.h"  //Includes headers of the web and style file
 #include "AppState.h"
@@ -36,6 +42,8 @@
 #define BUTTON_2 25
 #define BUTTON_3 33
 #define BUTTON_4 32
+
+#define LONG_PRESS_TIME 1500 // milliseconds
 
 #define DIRECTORY "/bin_images"
 
@@ -49,6 +57,17 @@ RTC_DS3231 rtc;
 String formattedTimeArray[5] = {"2025-05-27", "Tuesday", "11", "59", "AM"};
 
 char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+char months[12][4] = {
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+};
+
+int buttonPressTime = 0;
+bool buttonHeld = false;
+
+String lastDisplayedTime = "";
+
+int device_mode = 0; // 0 is clock, 1 is display
 
 /* ========================== SETUP ========================== */
 
@@ -141,9 +160,17 @@ void loop() {
 
   // Get the current time from the RTC
   DateTime now = rtc.now();
+  formatTime(now);
+  String currentTime = formattedTimeArray[2] + ":" + formattedTimeArray[3] + " " + formattedTimeArray[4];
 
-  Serial.printf("\nCurrent Formatted Time: %s\n", formatTime(now).c_str());
-  Serial.printf("\nCurrent Time: %s:%s %s\n", formattedTimeArray[2], formattedTimeArray[3], formattedTimeArray[4]);
+  if (currentTime != lastDisplayedTime && !device_mode) {
+    lastDisplayedTime = currentTime;  // update the stored time
+
+    displayClock(currentTime, formattedTimeArray[0], 70, 0);
+  }
+
+  //Serial.printf("\nCurrent Formatted Time: %s\n", formatTime(now).c_str());
+  //Serial.printf("\nCurrent Time: %s:%s %s\n", formattedTimeArray[2], formattedTimeArray[3], formattedTimeArray[4]);
 
   //Listen for client connections
   server.handleClient();
@@ -152,12 +179,12 @@ void loop() {
   app.currentFileName = getCurrentFileName();
 
   // display
-  if (app.wasPressed(app.currButton1, app.prevButton1)) {
+  if (app.wasPressed(app.currButton1, app.prevButton1) && device_mode) {
     handle_button_1();
   }
 
   // select prev file
-  if (app.wasPressed(app.currButton2, app.prevButton2)) {
+  if (app.wasPressed(app.currButton2, app.prevButton2 && device_mode)) {
     list_dir(SD, DIRECTORY);
 
     Serial.println("");
@@ -188,7 +215,7 @@ void loop() {
   }
 
   // select next file
-  if (app.wasPressed(app.currButton3, app.prevButton3)) {
+  if (app.wasPressed(app.currButton3, app.prevButton3) && device_mode) {
     list_dir(SD, DIRECTORY);
 
     Serial.println("");
@@ -217,15 +244,35 @@ void loop() {
     display_files();
   }
 
-  // show files
-  if (app.wasPressed(app.currButton4, app.prevButton4)) {
-    app.fileMode = !app.fileMode;
-    if (app.fileMode) {
-      Serial.println("Changed to File Select Mode");
-    } else {
-      Serial.println("Changed to Page Select Mode");
+  // show files OR go to clock mode (TOGGLED ON LONG PRESS)
+
+  if (!app.currButton4 && app.prevButton4){
+    buttonPressTime = millis();
+    buttonHeld = false;
+  }
+
+  if (!app.currButton4 && (millis() - buttonPressTime > LONG_PRESS_TIME)){
+    if (!buttonHeld) {
+      buttonHeld = true;
+      Serial.println("Long Press Detected: Change Modes");
+      device_mode = !device_mode;
+
+      Serial.print("Device is now in ");
+      Serial.println(device_mode ? "Display Mode" : "Clock Mode");
+      device_mode ? display_files() : displayClock(currentTime, formattedTimeArray[0], 70, 0);
     }
-    display_files();
+  }
+
+  if (app.wasPressed(app.currButton4, app.prevButton4) && device_mode) {
+    if (!buttonHeld){
+      app.fileMode = !app.fileMode;
+      if (app.fileMode) {
+        Serial.println("Changed to File Select Mode");
+      } else {
+        Serial.println("Changed to Page Select Mode");
+      }
+      display_files();
+    }
   }
   app.resetButtons();
 }
@@ -592,7 +639,8 @@ String formatTime(DateTime now){
   // Getting each time field in individual variables
   // And adding a leading zero when needed;
   String yearStr = String(now.year(), DEC);
-  String monthStr = (now.month() < 10 ? "0" : "") + String(now.month(), DEC);
+  //String monthStr = (now.month() < 10 ? "0" : "") + String(now.month(), DEC);
+  String monthStr = months[now.month() - 1];
   String dayStr = (now.day() < 10 ? "0" : "") + String(now.day(), DEC);
   String hourStr = (now.hour() < 10 ? "0" : "") + String(now.hour(), DEC); 
   String minuteStr = (now.minute() < 10 ? "0" : "") + String(now.minute(), DEC);
@@ -602,12 +650,124 @@ String formatTime(DateTime now){
   // Complete time string
   String formattedTime = dayOfWeek + ", " + yearStr + "-" + monthStr + "-" + dayStr + " " + hourStr + ":" + minuteStr + ":" + secondStr;
 
-  formattedTimeArray[0] = yearStr + "-" + monthStr + "-" + dayStr;
+  formattedTimeArray[0] = dayOfWeek + ", " + monthStr + " " + dayStr + ", " + yearStr;
   formattedTimeArray[1] = dayOfWeek;
-  formattedTimeArray[2] = (now.hour() == 0) ? "12" : (now.hour() > 12) ? String(now.hour() - 12, DEC) : String(now.hour(), DEC);
+  formattedTimeArray[2] = (now.hour() == 0) ? "12" : (now.hour() > 12) ? (now.hour()-12 < 10 ? "0" : "") + String(now.hour()-12, DEC) : (now.hour() < 10 ? "0" : "") + String(now.hour(), DEC);
   formattedTimeArray[3] = minuteStr;
   formattedTimeArray[4] = (now.hour() >= 12 && now.hour() != 0) ? "PM" : "AM";
 
   // Print the complete formatted time
   return formattedTime;
 }
+
+void displayClock(String time, String dateStr, int batteryPercentage, int minimized) {
+  // Split time into main and suffix (e.g., "12:45 PM")
+  String mainTime = time;
+  String suffix = "";
+
+  if (time.endsWith("AM") || time.endsWith("PM")) {
+    mainTime = time.substring(0, time.length() - 3);
+    suffix = time.substring(time.length() - 2); // "AM" or "PM"
+  }
+
+  display.setFont(&FreeSansBold24pt7b);
+  display.setTextSize(3);
+  
+  // Get bounding box for main time (HH:mm)
+  int16_t x1, y1;
+  uint16_t w, h;
+  display.getTextBounds(mainTime, 0, 0, &x1, &y1, &w, &h);
+
+  // Center HH:mm horizontally and vertically
+  int x_main = (400 - w) / 2;
+  int y_main = (300 + h) / 2;
+
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);
+
+    if (!minimized){
+      display.setFont(&FreeSansBold12pt7b);
+      display.setTextColor(GxEPD_BLACK);
+      display.setTextSize(1);
+      display.setCursor(20, 30);
+      display.print("Audrey's Clock");
+
+      // Date line (e.g., "Tuesday, May 28, 2025")
+      display.setFont(&FreeSans9pt7b);
+      display.setCursor(20, 60);
+      display.print(dateStr);
+
+      // Footer
+      display.setCursor(280, 290);
+      display.print("- from Nick <3");
+
+      // 🔋 Battery rectangle with percentage inside
+      int batteryX = 330;
+      int batteryY = 10;
+      int batteryWidth = 60;
+      int batteryHeight = 20;
+      int terminalWidth = 4;
+      int terminalHeight = 10;
+
+      // Set font and color for battery label
+      display.setFont(&FreeSans9pt7b);
+      display.setTextColor(GxEPD_BLACK);
+      String batteryStr = String(batteryPercentage) + "%";
+
+      // Measure width/height of the text
+      int16_t tx1, ty1;
+      uint16_t tw, th;
+      display.getTextBounds(batteryStr, 0, 0, &tx1, &ty1, &tw, &th);
+
+      // Position to the left of the battery icon, vertically centered
+      int textX = batteryX - tw - 6;  // 6 px margin
+      int textY = batteryY + (batteryHeight + th) / 2 - 2;
+
+      display.setCursor(textX, textY);
+      display.print(batteryStr);
+
+      // Draw outer battery shell
+      display.drawRect(batteryX, batteryY, batteryWidth, batteryHeight, GxEPD_BLACK);
+
+      // Draw battery terminal
+      display.fillRect(batteryX + batteryWidth, batteryY + (batteryHeight - terminalHeight)/2,
+                      terminalWidth, terminalHeight, GxEPD_BLACK);
+
+      // Draw fill bar (minimum width of 2 px for visibility)
+      int fillWidth = map(batteryPercentage, 0, 70, 0, batteryWidth - 4);
+      if (fillWidth > 0) {
+        display.fillRect(batteryX + 2, batteryY + 2, fillWidth, batteryHeight - 4, GxEPD_BLACK);
+      }
+
+      // ✅ Restore default color for everything else
+      display.setTextColor(GxEPD_BLACK);
+
+    }
+
+    // Draw main time (HH:mm)
+    display.setFont(&FreeSansBold24pt7b);
+    display.setTextSize(3);
+    display.setCursor(x_main - 12, y_main);
+    display.setTextColor(GxEPD_BLACK);
+    display.print(mainTime);
+
+    // Draw suffix (AM/PM) in smaller font in bottom-right
+    if (suffix.length() > 0) {
+      display.setFont(&FreeSansBold24pt7b);
+
+      int16_t sx1, sy1;
+      uint16_t sw, sh;
+      display.getTextBounds(suffix, 0, 0, &sx1, &sy1, &sw, &sh);
+
+      int x_suffix = 400 - sw - 20;  // 15px from right edge
+      int y_suffix = 300 - 20;       // 15px from bottom
+
+      display.setTextSize(1);
+      display.setCursor(x_suffix, y_suffix);
+      display.print(suffix);
+    }
+
+  } while (display.nextPage());
+}
+
