@@ -1,0 +1,179 @@
+(kicad_sch
+	(version 20231120)
+	(generator "eeschema")
+	(generator_version "8.0")
+	(uuid "9c9b769b-6d93-4967-88ab-f69ade058b54")
+	(paper "A4")
+	(lib_symbols)
+	(wire
+		(pts
+			(xy 106.68 78.74) (xy 125.73 78.74)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4a4a7d01-392f-4a77-b07f-83f087e13a26")
+	)
+	(wire
+		(pts
+			(xy 106.68 76.2) (xy 125.73 76.2)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "4f47975c-21fd-42c2-a1f3-43eef37a8f5a")
+	)
+	(wire
+		(pts
+			(xy 106.68 73.66) (xy 125.73 73.66)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "514663fe-73b8-4357-bc50-086b864ccda1")
+	)
+	(sheet
+		(at 125.73 68.58)
+		(size 16.51 15.24)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "5536cf67-6716-4fcb-b7cc-014c99deefc1")
+		(property "Sheetname" "ESP32"
+			(at 125.73 67.8684 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "esp32.kicad_sch"
+			(at 125.73 84.4046 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "SCL" input
+			(at 125.73 73.66 180)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+			(uuid "46197645-e74b-412a-acfd-6dccbfca947d")
+		)
+		(pin "SDA" input
+			(at 125.73 76.2 180)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+			(uuid "e454ff00-9794-4864-a6ed-5d2bdd8526eb")
+		)
+		(pin "ALRT" input
+			(at 125.73 78.74 180)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+			(uuid "8eaa89de-4f1c-4d2c-b074-0420df3b123b")
+		)
+		(instances
+			(project "ESP32_Clock_Gallery"
+				(path "/9c9b769b-6d93-4967-88ab-f69ade058b54"
+					(page "5")
+				)
+			)
+		)
+	)
+	(sheet
+		(at 93.98 68.58)
+		(size 12.7 15.24)
+		(fields_autoplaced yes)
+		(stroke
+			(width 0.1524)
+			(type solid)
+		)
+		(fill
+			(color 0 0 0 0.0000)
+		)
+		(uuid "7999240c-46a3-4533-9e5f-9ddc9415909a")
+		(property "Sheetname" "Power"
+			(at 93.98 67.8684 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left bottom)
+			)
+		)
+		(property "Sheetfile" "TP4056.kicad_sch"
+			(at 93.98 84.4046 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left top)
+			)
+		)
+		(pin "SCL" input
+			(at 106.68 73.66 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+			(uuid "eb50a861-8526-47df-9251-3d6a6d72a4ff")
+		)
+		(pin "SDA" input
+			(at 106.68 76.2 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+			(uuid "0e49a201-a474-42ef-9d1c-fbbba5cf960e")
+		)
+		(pin "ALRT" input
+			(at 106.68 78.74 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+			(uuid "c9e12eb8-2182-49e1-976f-97271a05e351")
+		)
+		(instances
+			(project "ESP32_Clock_Gallery"
+				(path "/9c9b769b-6d93-4967-88ab-f69ade058b54"
+					(page "3")
+				)
+			)
+		)
+	)
+	(sheet_instances
+		(path "/"
+			(page "1")
+		)
+	)
+)
