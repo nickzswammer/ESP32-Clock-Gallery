@@ -2,10 +2,10 @@
 **/.venv/
 
 # Ignore image processing folders
-/Backend/image_processor/processed_files/
-/Backend/image_processor/uploaded_files/
+/Firmware/Backend/image_processor/processed_files/
+/Firmware/Backend/image_processor/uploaded_files/
 
-/Backend/image_processor/debug_dithered.png
+/Firmware/Backend/image_processor/debug_dithered.png
 
 # Ignore these files everywhere (recursive)
 **/.DS_Store
