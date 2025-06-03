@@ -43,7 +43,9 @@
 #define BUTTON_3 33
 #define BUTTON_4 32
 
-#define LONG_PRESS_TIME 1500 // milliseconds
+#define LONG_PRESS_TIME 1500  // milliseconds
+
+#define MENU_ITEMS 2
 
 #define DIRECTORY "/bin_images"
 
@@ -54,20 +56,27 @@ AppState app;
 ESP32WebServer server(80);
 RTC_DS3231 rtc;
 
-String formattedTimeArray[5] = {"2025-05-27", "Tuesday", "11", "59", "AM"};
+String formattedTimeArray[5] = { "Tuesday, May 29, 2025", "Tuesday", "11", "59", "AM" };
 
-char daysOfTheWeek[7][12] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+char daysOfTheWeek[7][12] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
 char months[12][4] = {
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
-int buttonPressTime = 0;
-bool buttonHeld = false;
+// for long button presses (B1 & B4)
+unsigned long button1PressTime = 0;
+bool button1Held = false;
+
+unsigned long button4PressTime = 0;
+bool button4Held = false;
 
 String lastDisplayedTime = "";
 
-int device_mode = 0; // 0 is clock, 1 is display
+uint8_t menu_selected_index = 0;
+
+int device_mode = 0;  // 0 is clock, 1 is display
+int menu = 0;         // 0 is menu off, 1 is menu on
 
 /* ========================== SETUP ========================== */
 
@@ -133,7 +142,7 @@ void setup() {
   list_dir(SD, DIRECTORY);
 
   // RTC Module
-  if (! rtc.begin()) {
+  if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
     Serial.flush();
   }
@@ -163,10 +172,13 @@ void loop() {
   formatTime(now);
   String currentTime = formattedTimeArray[2] + ":" + formattedTimeArray[3] + " " + formattedTimeArray[4];
 
-  if (currentTime != lastDisplayedTime && !device_mode) {
+  // get battery percentage
+  int batteryPercentage = 67;
+
+  if (currentTime != lastDisplayedTime && !device_mode && !menu) {
     lastDisplayedTime = currentTime;  // update the stored time
 
-    displayClock(currentTime, formattedTimeArray[0], 70, 0);
+    displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
   }
 
   //Serial.printf("\nCurrent Formatted Time: %s\n", formatTime(now).c_str());
@@ -179,8 +191,30 @@ void loop() {
   app.currentFileName = getCurrentFileName();
 
   // display
-  if (app.wasPressed(app.currButton1, app.prevButton1) && device_mode) {
-    handle_button_1();
+  // display curr file or toggle menu (TOGGLED ON LONG PRESS)
+
+  // detects button press
+  if (!app.currButton1 && app.prevButton1) {
+    button1PressTime = millis();
+    button1Held = false;
+  }
+
+  if (!app.currButton1 && (millis() - button1PressTime > LONG_PRESS_TIME)) {
+    if (!button1Held) {
+      button1Held = true;
+      Serial.println("Long Press For Button 1 Detected: Toggle Menu");
+      menu = !menu;
+
+      Serial.print("Menu is now ");
+      Serial.println(menu ? "Showing" : "Not Showing");
+      menu ? displayMenu() : displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+    }
+  }
+
+  // regular short press behavior
+  if (app.wasPressed(app.currButton1, app.prevButton1)) {
+    if (!button1Held && device_mode)
+      handle_button_1();
   }
 
   // select prev file
@@ -214,6 +248,12 @@ void loop() {
     display_files();
   }
 
+  // if menu open, select prev thing
+  else if (app.wasPressed(app.currButton2, app.prevButton2 && menu)) {
+    menu_selected_index = (menu_selected_index - 1 + MENU_ITEMS) % MENU_ITEMS;
+    displayMenu();
+  }
+
   // select next file
   if (app.wasPressed(app.currButton3, app.prevButton3) && device_mode) {
     list_dir(SD, DIRECTORY);
@@ -244,27 +284,34 @@ void loop() {
     display_files();
   }
 
-  // show files OR go to clock mode (TOGGLED ON LONG PRESS)
-
-  if (!app.currButton4 && app.prevButton4){
-    buttonPressTime = millis();
-    buttonHeld = false;
+  // if menu open, select prev thing
+  else if (app.wasPressed(app.currButton3, app.prevButton3 && menu)) {
+    menu_selected_index = (menu_selected_index + 1) % MENU_ITEMS;
+    displayMenu();
   }
 
-  if (!app.currButton4 && (millis() - buttonPressTime > LONG_PRESS_TIME)){
-    if (!buttonHeld) {
-      buttonHeld = true;
+  // show files OR go to clock mode (TOGGLED ON LONG PRESS)
+
+  // detects button press
+  if (!app.currButton4 && app.prevButton4) {
+    button4PressTime = millis();
+    button4Held = false;
+  }
+
+  if (!app.currButton4 && (millis() - button4PressTime > LONG_PRESS_TIME)) {
+    if (!button4Held) {
+      button4Held = true;
       Serial.println("Long Press Detected: Change Modes");
       device_mode = !device_mode;
 
       Serial.print("Device is now in ");
       Serial.println(device_mode ? "Display Mode" : "Clock Mode");
-      device_mode ? display_files() : displayClock(currentTime, formattedTimeArray[0], 70, 0);
+      device_mode ? display_files() : displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
     }
   }
 
-  if (app.wasPressed(app.currButton4, app.prevButton4) && device_mode) {
-    if (!buttonHeld){
+  if (app.wasPressed(app.currButton4, app.prevButton4)) {
+    if (!button4Held && device_mode) {
       app.fileMode = !app.fileMode;
       if (app.fileMode) {
         Serial.println("Changed to File Select Mode");
@@ -273,6 +320,9 @@ void loop() {
       }
       display_files();
     }
+    // if in menu, handle sleep
+    else if (!button4Held && menu)
+      Serial.printf("Button 4 In Menu Press Detected for: %d\n", menu_selected_index);
   }
   app.resetButtons();
 }
@@ -442,7 +492,7 @@ void handleFileUpload() {
 String uploadedTimeString;
 
 void handleTimeUpload() {
-  
+
   if (server.hasArg("timeUploadProcess")) {
     uploadedTimeString = server.arg("timeUploadProcess");
 
@@ -635,14 +685,14 @@ String getCurrentFileName() {
   return app.fileNames[page][file];
 }
 
-String formatTime(DateTime now){
+String formatTime(DateTime now) {
   // Getting each time field in individual variables
   // And adding a leading zero when needed;
   String yearStr = String(now.year(), DEC);
   //String monthStr = (now.month() < 10 ? "0" : "") + String(now.month(), DEC);
   String monthStr = months[now.month() - 1];
   String dayStr = (now.day() < 10 ? "0" : "") + String(now.day(), DEC);
-  String hourStr = (now.hour() < 10 ? "0" : "") + String(now.hour(), DEC); 
+  String hourStr = (now.hour() < 10 ? "0" : "") + String(now.hour(), DEC);
   String minuteStr = (now.minute() < 10 ? "0" : "") + String(now.minute(), DEC);
   String secondStr = (now.second() < 10 ? "0" : "") + String(now.second(), DEC);
   String dayOfWeek = daysOfTheWeek[now.dayOfTheWeek()];
@@ -652,7 +702,8 @@ String formatTime(DateTime now){
 
   formattedTimeArray[0] = dayOfWeek + ", " + monthStr + " " + dayStr + ", " + yearStr;
   formattedTimeArray[1] = dayOfWeek;
-  formattedTimeArray[2] = (now.hour() == 0) ? "12" : (now.hour() > 12) ? (now.hour()-12 < 10 ? "0" : "") + String(now.hour()-12, DEC) : (now.hour() < 10 ? "0" : "") + String(now.hour(), DEC);
+  formattedTimeArray[2] = (now.hour() == 0) ? "12" : (now.hour() > 12) ? (now.hour() - 12 < 10 ? "0" : "") + String(now.hour() - 12, DEC)
+                                                                       : (now.hour() < 10 ? "0" : "") + String(now.hour(), DEC);
   formattedTimeArray[3] = minuteStr;
   formattedTimeArray[4] = (now.hour() >= 12 && now.hour() != 0) ? "PM" : "AM";
 
@@ -667,26 +718,26 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
 
   if (time.endsWith("AM") || time.endsWith("PM")) {
     mainTime = time.substring(0, time.length() - 3);
-    suffix = time.substring(time.length() - 2); // "AM" or "PM"
+    suffix = time.substring(time.length() - 2);  // "AM" or "PM"
   }
 
   display.setFont(&FreeSansBold24pt7b);
   display.setTextSize(3);
-  
+
   // Get bounding box for main time (HH:mm)
   int16_t x1, y1;
   uint16_t w, h;
   display.getTextBounds(mainTime, 0, 0, &x1, &y1, &w, &h);
 
   // Center HH:mm horizontally and vertically
-  int x_main = (400 - w) / 2;
+  int x_main = (400 - w) / 2 - 15;
   int y_main = (300 + h) / 2;
 
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
 
-    if (!minimized){
+    if (!minimized) {
       display.setFont(&FreeSansBold12pt7b);
       display.setTextColor(GxEPD_BLACK);
       display.setTextSize(1);
@@ -731,24 +782,23 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
       display.drawRect(batteryX, batteryY, batteryWidth, batteryHeight, GxEPD_BLACK);
 
       // Draw battery terminal
-      display.fillRect(batteryX + batteryWidth, batteryY + (batteryHeight - terminalHeight)/2,
-                      terminalWidth, terminalHeight, GxEPD_BLACK);
+      display.fillRect(batteryX + batteryWidth, batteryY + (batteryHeight - terminalHeight) / 2,
+                       terminalWidth, terminalHeight, GxEPD_BLACK);
 
       // Draw fill bar (minimum width of 2 px for visibility)
-      int fillWidth = map(batteryPercentage, 0, 70, 0, batteryWidth - 4);
+      int fillWidth = map(batteryPercentage, 0, 100, 0, batteryWidth - 4);
       if (fillWidth > 0) {
         display.fillRect(batteryX + 2, batteryY + 2, fillWidth, batteryHeight - 4, GxEPD_BLACK);
       }
 
       // ✅ Restore default color for everything else
       display.setTextColor(GxEPD_BLACK);
-
     }
 
     // Draw main time (HH:mm)
     display.setFont(&FreeSansBold24pt7b);
     display.setTextSize(3);
-    display.setCursor(x_main - 12, y_main);
+    display.setCursor(x_main, y_main);
     display.setTextColor(GxEPD_BLACK);
     display.print(mainTime);
 
@@ -760,7 +810,7 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
       uint16_t sw, sh;
       display.getTextBounds(suffix, 0, 0, &sx1, &sy1, &sw, &sh);
 
-      int x_suffix = 400 - sw - 20;  // 15px from right edge
+      int x_suffix = 400 - sw - 30;  // 15px from right edge
       int y_suffix = 300 - 20;       // 15px from bottom
 
       display.setTextSize(1);
@@ -771,3 +821,30 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
   } while (display.nextPage());
 }
 
+void displayMenu() {
+  String menu_elements[MENU_ITEMS] = { "Sleep", "Hibernation (display one file)" };
+  uint8_t curr_y_pos = 100;
+
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);  // clear the display
+    display.setTextColor(GxEPD_BLACK);
+    display.setFont(&FreeSansBold24pt7b);
+    display.setTextSize(1);
+    display.setCursor(60, 50);  // starting position (x,y)
+    display.print("Menu");
+
+    display.setFont(&FreeSans9pt7b);
+
+    for (int i = 0; i < MENU_ITEMS; i++) {
+      if (i == menu_selected_index) {
+        display.setCursor(45, curr_y_pos - 2);
+        display.print(">");
+      }
+      display.setCursor(60, curr_y_pos);
+      display.print(menu_elements[i].c_str());
+      curr_y_pos += 30;
+    }
+
+  } while (display.nextPage());
+}
