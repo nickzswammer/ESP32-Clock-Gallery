@@ -1,4 +1,11 @@
-24191076369966041
+24213815463016726
+1984617
+PHOENIX_1984617
+
+
+0
+2
+2
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -13,6 +20,41 @@ audio belton reverb
 0
 7
 7
+B8B-PH-K-S_LF__SN_
+JST_B8B-PH-K-S_LF__SN_
+
+
+0
+8
+8
+B5819SW
+SDO_SOD-123_MCC
+
+B5819W-TP 
+0
+2
+2
+B5819SW
+SDO_SOD-123_MCC-L
+
+B5819W-TP 
+0
+2
+2
+B5819SW
+SDO_SOD-123_MCC-M
+
+B5819W-TP 
+0
+2
+2
+BM08B_SRSS_TB
+CONN_BM08B-SRSS-TBLFSN_JST
+
+BM08B-SRSS-TBLFSN 
+0
+10
+10
 Battery
 BatteryClip_Keystone_54_D16-19mm
 Battery clip for batteries with a diameter between 16-19 mm: https://www.keyelco.com/product.cfm/product_id/826
@@ -56783,6 +56825,13 @@ One digit LED 7 segment SA39-11 SC39-11 SA39-12 SC39-12
 0
 10
 10
+ESP32-DEVKIT-V1
+MODULE_ESP32_DEVKIT_V1
+
+
+0
+30
+30
 Ferrite_THT
 LairdTech_28C0236-0JW-10
 Ferrite, vertical, LairdTech 28C0236-0JW-10, https://assets.lairdtech.com/home/brandworld/files/28C0236-0JW-10.pdf, JW Miller core https://www.bourns.com/products/magnetic-products/j.w.-miller-through-hole-ferrite-beads-emi-filters
@@ -57959,6 +58008,13 @@ heatsink
 0
 0
 0
+IRLML6402TRPBF
+SOT95P237X112-3N
+
+
+0
+3
+3
 Inductor_SMD
 L_6.3x6.3_H3
 Choke, SMD, 6.3x6.3mm 3mm height
@@ -65246,6 +65302,13 @@ SON50P200X200X80-9N
 0
 9
 9
+MBR120VLSFT1G
+DIOM3616X98N
+
+
+0
+2
+2
 Module
 A20_OLINUXINO_LIME2
 A20 Olinuxino LIME2, 1.2GHz, 512-1024MB RAM, Micro-SD, NAND or eMMC, 1000Mbit Ethernet
@@ -89886,6 +89949,13 @@ rotary encoder illuminated switch vertical
 0
 9
 8
+SM02B-SRSS-TB_LF__SN_
+SM02B-SRSS-TB_LF__SN_
+<b>SM02B-SRSS-TB</b><br>
+
+0
+4
+4
 Sensor
 ASAIR_AM2302_P2.54mm_Lead2.75mm_TabDown
 Temperature and humidity module, http://akizukidenshi.com/download/ds/aosong/AM2302.pdf
@@ -91559,6 +91629,13 @@ SOP127P600X175-9N
 0
 9
 9
+TPS63060DSCT
+CONV_TPS63060DSCT
+
+
+0
+16
+16
 TerminalBlock
 TerminalBlock_Altech_AK300-2_P5.00mm
 Altech AK300 terminal block, pitch 5.0mm, 45 degree angled, see http://www.mouser.com/ds/2/16/PCBMETRC-24178.pdf
@@ -97194,6 +97271,13 @@ igbt diode module
 0
 25
 25
+UJC_V_G_SMT_P6_TR
+SAMESKY_UJC-V-G-SMT-P6-TR
+
+
+0
+8
+8
 Valve
 Valve_ECC-83-1
 Valve ECC-83-1 round pins
@@ -97975,6 +98059,13 @@ Varistor
 Varistor_Panasonic_VF
 Panasonic VF series varistor, 6x8mm body, 3.2mm height, https://mediap.industry.panasonic.eu/assets/imported/industrial.panasonic.com/cdbs/www-data/pdf/AWA0000/AWA0000C4.pdf
 Varistor VF
+0
+2
+2
+XFL4020-102MEC
+IND_XFL4020-102MEC
+
+
 0
 2
 2

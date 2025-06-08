@@ -7,7 +7,7 @@
 	(lib_symbols)
 	(wire
 		(pts
-			(xy 106.68 78.74) (xy 125.73 78.74)
+			(xy 127 102.87) (xy 140.97 102.87)
 		)
 		(stroke
 			(width 0)
@@ -17,7 +17,7 @@
 	)
 	(wire
 		(pts
-			(xy 106.68 76.2) (xy 125.73 76.2)
+			(xy 127 100.33) (xy 140.97 100.33)
 		)
 		(stroke
 			(width 0)
@@ -27,7 +27,7 @@
 	)
 	(wire
 		(pts
-			(xy 106.68 73.66) (xy 125.73 73.66)
+			(xy 127 97.79) (xy 140.97 97.79)
 		)
 		(stroke
 			(width 0)
@@ -36,7 +36,7 @@
 		(uuid "514663fe-73b8-4357-bc50-086b864ccda1")
 	)
 	(sheet
-		(at 125.73 68.58)
+		(at 140.97 92.71)
 		(size 16.51 15.24)
 		(fields_autoplaced yes)
 		(stroke
@@ -48,7 +48,7 @@
 		)
 		(uuid "5536cf67-6716-4fcb-b7cc-014c99deefc1")
 		(property "Sheetname" "ESP32"
-			(at 125.73 67.8684 0)
+			(at 140.97 91.9984 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -57,7 +57,7 @@
 			)
 		)
 		(property "Sheetfile" "esp32.kicad_sch"
-			(at 125.73 84.4046 0)
+			(at 140.97 108.5346 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -66,7 +66,7 @@
 			)
 		)
 		(pin "SCL" input
-			(at 125.73 73.66 180)
+			(at 140.97 97.79 180)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -76,7 +76,7 @@
 			(uuid "46197645-e74b-412a-acfd-6dccbfca947d")
 		)
 		(pin "SDA" input
-			(at 125.73 76.2 180)
+			(at 140.97 100.33 180)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -86,7 +86,7 @@
 			(uuid "e454ff00-9794-4864-a6ed-5d2bdd8526eb")
 		)
 		(pin "ALRT" input
-			(at 125.73 78.74 180)
+			(at 140.97 102.87 180)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -104,7 +104,7 @@
 		)
 	)
 	(sheet
-		(at 93.98 68.58)
+		(at 114.3 92.71)
 		(size 12.7 15.24)
 		(fields_autoplaced yes)
 		(stroke
@@ -116,7 +116,7 @@
 		)
 		(uuid "7999240c-46a3-4533-9e5f-9ddc9415909a")
 		(property "Sheetname" "Power"
-			(at 93.98 67.8684 0)
+			(at 114.3 91.9984 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -124,8 +124,8 @@
 				(justify left bottom)
 			)
 		)
-		(property "Sheetfile" "TP4056.kicad_sch"
-			(at 93.98 84.4046 0)
+		(property "Sheetfile" "power.kicad_sch"
+			(at 114.3 108.5346 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -134,7 +134,7 @@
 			)
 		)
 		(pin "SCL" input
-			(at 106.68 73.66 0)
+			(at 127 97.79 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -144,7 +144,7 @@
 			(uuid "eb50a861-8526-47df-9251-3d6a6d72a4ff")
 		)
 		(pin "SDA" input
-			(at 106.68 76.2 0)
+			(at 127 100.33 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -154,7 +154,7 @@
 			(uuid "0e49a201-a474-42ef-9d1c-fbbba5cf960e")
 		)
 		(pin "ALRT" input
-			(at 106.68 78.74 0)
+			(at 127 102.87 0)
 			(effects
 				(font
 					(size 1.27 1.27)
