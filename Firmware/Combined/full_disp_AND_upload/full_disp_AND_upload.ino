@@ -83,7 +83,7 @@ int menu = 0;         // 0 is menu off, 1 is menu on
 void setup() {
   Serial.begin(115200);
   display.init(115200);
-  display.setRotation(0);
+  display.setRotation(2);
   display.setFullWindow();
 
   /* ===================== WIFI BLOCK ===================== */
@@ -321,6 +321,7 @@ void loop() {
       display_files();
     }
     // if in menu, handle sleep
+    // menu_selected_index: (0 for Sleep, 1 for hibernation)
     else if (!button4Held && menu)
       Serial.printf("Button 4 In Menu Press Detected for: %d\n", menu_selected_index);
   }

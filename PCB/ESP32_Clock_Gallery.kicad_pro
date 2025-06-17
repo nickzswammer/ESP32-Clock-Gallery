@@ -37,9 +37,9 @@
         "other_text_thickness": 0.15,
         "other_text_upright": false,
         "pads": {
-          "drill": 0.762,
-          "height": 1.524,
-          "width": 1.524
+          "drill": 0.0,
+          "height": 1.55,
+          "width": 0.6
         },
         "silk_line_width": 0.1,
         "silk_text_italic": false,
@@ -48,7 +48,7 @@
         "silk_text_thickness": 0.1,
         "silk_text_upright": false,
         "zones": {
-          "min_clearance": 0.5
+          "min_clearance": 0.2
         }
       },
       "diff_pair_dimensions": [
@@ -58,7 +58,31 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [],
+      "drc_exclusions": [
+        "annular_width|127900000|81425000|04d462c5-513e-4fca-9ff9-c2977499fc07|00000000-0000-0000-0000-000000000000",
+        "annular_width|127900000|82425000|d74a4f62-ac95-4914-bd5d-bf6750182dc5|00000000-0000-0000-0000-000000000000",
+        "annular_width|128400000|81925000|47712c57-aedc-400e-ab87-1c07326ad485|00000000-0000-0000-0000-000000000000",
+        "annular_width|128900000|81425000|e43df5f3-13ce-4ec2-85dd-324b7300b597|00000000-0000-0000-0000-000000000000",
+        "annular_width|128900000|82425000|8eb9513f-36b2-490f-83e0-ad85b0b1f20c|00000000-0000-0000-0000-000000000000",
+        "clearance|127407000|80875000|8c571d54-e5bb-4819-a4bd-25e6fdb4a127|5c740175-f6dc-4562-be91-11c26ddcf165",
+        "clearance|127407000|82975000|d2f4b3f1-5db7-4815-8df3-a542a34c09a4|5c740175-f6dc-4562-be91-11c26ddcf165",
+        "clearance|127907000|80875000|e7991892-d602-4a0a-8393-24f8a8fb3e28|5c740175-f6dc-4562-be91-11c26ddcf165",
+        "clearance|127907000|82975000|7b2f2557-a28f-4725-a686-b83ed9b547d4|5c740175-f6dc-4562-be91-11c26ddcf165",
+        "clearance|128407000|80875000|890e4d6d-4837-4f15-9e83-5737da4f3f28|5c740175-f6dc-4562-be91-11c26ddcf165",
+        "clearance|128407000|82975000|371395f3-1848-4009-83be-0aab77a4c33a|5c740175-f6dc-4562-be91-11c26ddcf165",
+        "clearance|129407000|80875000|b31aea68-ecc6-44fa-a73f-19c0e83af4ac|5c740175-f6dc-4562-be91-11c26ddcf165",
+        "clearance|129407000|82975000|20e42566-8fb1-461c-a910-2a48557ec1ac|5c740175-f6dc-4562-be91-11c26ddcf165",
+        "clearance|135101250|99835000|ab0de558-5fa0-4405-8e5f-147c1e83237c|9348533e-c5d1-4faa-bc93-d82e97887055",
+        "clearance|135601250|100735000|9ac49dbe-37f2-42ef-ba6d-ee578bc18633|9348533e-c5d1-4faa-bc93-d82e97887055",
+        "clearance|135601250|99835000|275540f2-477a-4a87-8182-934886624866|9348533e-c5d1-4faa-bc93-d82e97887055",
+        "clearance|136101250|100735000|30e0024f-a4ca-430c-961e-9de80edb8a4c|9348533e-c5d1-4faa-bc93-d82e97887055",
+        "clearance|136398750|99835000|77ad98fe-673d-4a4f-8d89-1ee2cbcef2df|9348533e-c5d1-4faa-bc93-d82e97887055",
+        "solder_mask_bridge|135101250|99835000|ab0de558-5fa0-4405-8e5f-147c1e83237c|9348533e-c5d1-4faa-bc93-d82e97887055",
+        "solder_mask_bridge|135601250|100735000|9ac49dbe-37f2-42ef-ba6d-ee578bc18633|9348533e-c5d1-4faa-bc93-d82e97887055",
+        "solder_mask_bridge|135601250|99835000|275540f2-477a-4a87-8182-934886624866|9348533e-c5d1-4faa-bc93-d82e97887055",
+        "solder_mask_bridge|136101250|100735000|30e0024f-a4ca-430c-961e-9de80edb8a4c|9348533e-c5d1-4faa-bc93-d82e97887055",
+        "solder_mask_bridge|136398750|99835000|77ad98fe-673d-4a4f-8d89-1ee2cbcef2df|9348533e-c5d1-4faa-bc93-d82e97887055"
+      ],
       "meta": {
         "version": 2
       },
@@ -487,10 +511,10 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
-      "pos_files": "",
+      "plot": "gerbers/",
+      "pos_files": "production/",
       "specctra_dsn": "",
-      "step": "",
+      "step": "ESP32_Clock_Gallery.step",
       "svg": "",
       "vrml": ""
     },
@@ -498,7 +522,7 @@
   },
   "schematic": {
     "annotate_start_num": 0,
-    "bom_export_filename": "C:\\Users\\Zhang\\Downloads\\ESP32_Clock_Gallery.csv",
+    "bom_export_filename": "production\\ESP32_Clock_Gallery.csv",
     "bom_fmt_presets": [],
     "bom_fmt_settings": {
       "field_delimiter": ",",

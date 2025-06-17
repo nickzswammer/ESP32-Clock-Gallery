@@ -2156,6 +2156,16 @@
 	)
 	(wire
 		(pts
+			(xy 226.06 55.88) (xy 223.52 55.88)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "20258571-ccf4-4606-86e9-d7867d81ec17")
+	)
+	(wire
+		(pts
 			(xy 93.98 81.28) (xy 93.98 88.9)
 		)
 		(stroke
@@ -2306,13 +2316,13 @@
 	)
 	(wire
 		(pts
-			(xy 226.06 43.18) (xy 214.63 43.18)
+			(xy 223.52 55.88) (xy 223.52 64.77)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "79277364-c233-4892-9661-9766fc1e6d3b")
+		(uuid "7206fbee-2d9c-415f-81e6-405ad2f39759")
 	)
 	(wire
 		(pts
@@ -2344,6 +2354,16 @@
 		)
 		(uuid "7e87ecb5-4c89-418c-851f-93862e5c90fa")
 	)
+	(wire
+		(pts
+			(xy 217.17 55.88) (xy 217.17 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7f2b95f4-180b-4d22-a550-f3025b992adf")
+	)
 	(polyline
 		(pts
 			(xy 181.61 12.7) (xy 181.61 80.01)
@@ -2353,16 +2373,6 @@
 			(type dash)
 		)
 		(uuid "96e59593-11b1-4360-bee0-4506aea3d558")
-	)
-	(wire
-		(pts
-			(xy 214.63 40.64) (xy 226.06 40.64)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "985e4a12-d795-403d-a1e8-439c1cc3ea65")
 	)
 	(wire
 		(pts
@@ -2393,6 +2403,16 @@
 			(type default)
 		)
 		(uuid "a91c7b46-8f54-4a2a-abb9-d21b5d4542b8")
+	)
+	(wire
+		(pts
+			(xy 217.17 58.42) (xy 226.06 58.42)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "a939c2b0-dda4-4aaf-8c36-7f04f5ad8ec9")
 	)
 	(polyline
 		(pts
@@ -2443,26 +2463,6 @@
 			(type default)
 		)
 		(uuid "ed30b8e8-07c8-4f66-a6b9-dccd0c5224ff")
-	)
-	(wire
-		(pts
-			(xy 214.63 34.29) (xy 214.63 40.64)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "eeac22bf-92b7-4c22-ae34-bd80a94a298e")
-	)
-	(wire
-		(pts
-			(xy 214.63 43.18) (xy 214.63 48.26)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "fd2058a9-0317-46ca-8c49-90bccf5e77c9")
 	)
 	(polyline
 		(pts
@@ -2532,6 +2532,17 @@
 		)
 		(uuid "984d064c-b33e-410a-b1f6-7c64efb17229")
 	)
+	(label "CS_DISP"
+		(at 226.06 48.26 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "06ed1d77-c751-465e-8394-6aac8f20ca5e")
+	)
 	(label "B1"
 		(at 95.25 68.58 180)
 		(fields_autoplaced yes)
@@ -2565,17 +2576,6 @@
 		)
 		(uuid "11215a80-ca67-497a-9c6e-17da0c0a215e")
 	)
-	(label "RST"
-		(at 226.06 55.88 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "16650928-8b4b-414d-a3c2-ce0486c2a7fe")
-	)
 	(label "MISO"
 		(at 125.73 60.96 0)
 		(fields_autoplaced yes)
@@ -2608,6 +2608,17 @@
 			(justify right bottom)
 		)
 		(uuid "1f96f7e6-5e8b-4f6f-a333-76610f6df710")
+	)
+	(label "BUSY"
+		(at 226.06 40.64 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "2bf398bd-1f82-43e1-a0de-5f3189debf40")
 	)
 	(label "SQW"
 		(at 95.25 71.12 180)
@@ -2653,8 +2664,8 @@
 		)
 		(uuid "3f0916c1-8e00-4474-8293-fa5cf4149958")
 	)
-	(label "BUSY"
-		(at 226.06 58.42 180)
+	(label "CLK"
+		(at 226.06 50.8 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -2662,7 +2673,18 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "40041770-dc92-4458-a44f-7faad11e539b")
+		(uuid "5122b595-fb29-49a1-aa1c-84c6771a7bcf")
+	)
+	(label "MOSI"
+		(at 226.06 53.34 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "557c0e79-5c7b-4236-973d-1f04a11cbb43")
 	)
 	(label "B4"
 		(at 95.25 60.96 180)
@@ -2697,17 +2719,6 @@
 		)
 		(uuid "69c0f804-1e46-403a-98ae-dccafdfda32b")
 	)
-	(label "CS_DISP"
-		(at 226.06 50.8 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "73308aa5-e766-46f9-b8dd-962282a9e67f")
-	)
 	(label "DC"
 		(at 125.73 68.58 0)
 		(fields_autoplaced yes)
@@ -2718,6 +2729,17 @@
 			(justify left bottom)
 		)
 		(uuid "73c8bf4a-a611-49ba-98fb-784ab05bb11c")
+	)
+	(label "DC"
+		(at 226.06 45.72 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "7f373c31-3dc2-4c0f-9c4e-a136c226da37")
 	)
 	(label "MOSI"
 		(at 125.73 48.26 0)
@@ -2774,8 +2796,8 @@
 		)
 		(uuid "b84e835c-2800-4102-8f89-139779e26eb5")
 	)
-	(label "MOSI"
-		(at 226.06 45.72 180)
+	(label "RST"
+		(at 226.06 43.18 180)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -2783,7 +2805,7 @@
 			)
 			(justify right bottom)
 		)
-		(uuid "c94ab153-01dc-4a86-b449-85150bfa76b1")
+		(uuid "bec6740f-77f5-4610-91e5-8e59307486b4")
 	)
 	(label "SQW"
 		(at 59.69 82.55 0)
@@ -2795,28 +2817,6 @@
 			(justify left bottom)
 		)
 		(uuid "ccc07542-2441-49b6-9c7b-4082c9261177")
-	)
-	(label "DC"
-		(at 226.06 53.34 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "d0b3a874-3eed-4a12-9557-0486fbb3ce11")
-	)
-	(label "CLK"
-		(at 226.06 48.26 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "d4545b4d-6ae8-46cd-ab2f-2d776f437b93")
 	)
 	(label "B2"
 		(at 154.94 62.23 180)
@@ -3047,6 +3047,73 @@
 			(project "ESP32_Clock_Gallery"
 				(path "/9c9b769b-6d93-4967-88ab-f69ade058b54/5536cf67-6716-4fcb-b7cc-014c99deefc1"
 					(reference "U6")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 223.52 64.77 0)
+		(mirror y)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "050e19dc-fcd0-4e43-b6c2-70c6180fffc2")
+		(property "Reference" "#PWR023"
+			(at 223.52 71.12 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 223.52 69.85 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 223.52 64.77 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 223.52 64.77 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 223.52 64.77 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "8433b46b-1c31-4022-a5cc-26392a3ed5d8")
+		)
+		(instances
+			(project "ESP32_Clock_Gallery"
+				(path "/9c9b769b-6d93-4967-88ab-f69ade058b54/5536cf67-6716-4fcb-b7cc-014c99deefc1"
+					(reference "#PWR023")
 					(unit 1)
 				)
 			)
@@ -3313,72 +3380,6 @@
 			(project "ESP32_Clock_Gallery"
 				(path "/9c9b769b-6d93-4967-88ab-f69ade058b54/5536cf67-6716-4fcb-b7cc-014c99deefc1"
 					(reference "#PWR020")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 214.63 48.26 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "43d0295a-bfe0-4189-89c7-d62a3621ed14")
-		(property "Reference" "#PWR023"
-			(at 214.63 54.61 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Value" "GND"
-			(at 214.63 53.34 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" ""
-			(at 214.63 48.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 214.63 48.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 214.63 48.26 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "a014fb87-c7f6-4863-a81c-ee6227f9cf5b")
-		)
-		(instances
-			(project "ESP32_Clock_Gallery"
-				(path "/9c9b769b-6d93-4967-88ab-f69ade058b54/5536cf67-6716-4fcb-b7cc-014c99deefc1"
-					(reference "#PWR023")
 					(unit 1)
 				)
 			)
@@ -4192,16 +4193,17 @@
 	)
 	(symbol
 		(lib_id "power:+3V3")
-		(at 214.63 34.29 0)
+		(at 217.17 55.88 0)
+		(mirror y)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "fd10583b-9e2a-49fd-a658-db2be9cae4c4")
+		(uuid "e3617236-a42c-4de6-a98f-fcb4b2eab580")
 		(property "Reference" "#PWR022"
-			(at 214.63 38.1 0)
+			(at 217.17 59.69 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4210,7 +4212,7 @@
 			)
 		)
 		(property "Value" "+3V3"
-			(at 214.63 29.21 0)
+			(at 217.17 50.8 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4218,7 +4220,7 @@
 			)
 		)
 		(property "Footprint" ""
-			(at 214.63 34.29 0)
+			(at 217.17 55.88 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4227,7 +4229,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 214.63 34.29 0)
+			(at 217.17 55.88 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4236,7 +4238,7 @@
 			)
 		)
 		(property "Description" "Power symbol creates a global label with name \"+3V3\""
-			(at 214.63 34.29 0)
+			(at 217.17 55.88 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4245,7 +4247,7 @@
 			)
 		)
 		(pin "1"
-			(uuid "909eb729-3e6b-46ec-88fc-73d8a673e514")
+			(uuid "1959be68-b417-4573-922f-da9e0cdb3376")
 		)
 		(instances
 			(project "ESP32_Clock_Gallery"
