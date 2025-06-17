@@ -15,6 +15,7 @@
 #include <Fonts/FreeSansBold24pt7b.h>
 #include <Fonts/FreeSansBold12pt7b.h>
 #include <Fonts/FreeSans9pt7b.h>
+#include <MAX17043.h>
 
 // Wifi Libraries
 #include <WiFi.h>            //Built-in
@@ -50,6 +51,9 @@
 #define DIRECTORY "/bin_images"
 
 AppState app;
+
+// battery percentage
+MAX1704X _fuelGauge = MAX1704X(MAX17043_mV);
 
 /* ========================== VARIABLES ========================== */
 
@@ -141,7 +145,7 @@ void setup() {
 
   list_dir(SD, DIRECTORY);
 
-  // RTC Module
+  /* ===================== INIT RTC ===================== */
   if (!rtc.begin()) {
     Serial.println("Couldn't find RTC");
     Serial.flush();
@@ -157,7 +161,58 @@ void setup() {
     //rtc.adjust(DateTime(2014, 1, 21, 3, 0, 0));
   }
 
+  /* ===================== INIT FUEL GUAGE ===================== */
+    //
+  // Initialize the fuel gauge without an address.
+  //
+  Serial.println("Initializing the fuel gauge instance.");
+  _fuelGauge.begin(DEFER_ADDRESS);
+
   Serial.println("SETUP EXECUTED!");
+    //
+  // Find a connected fuel gauge on the i2c bus.
+  //
+  Serial.println("Searching for device...");
+  uint8_t deviceAddress = _fuelGauge.findFirstDevice();
+
+  //
+  // If a device is NOT found, the address returned will be 0.
+  //
+  if (deviceAddress > 0)
+  {
+    //
+    // Set the device address.
+    //
+    _fuelGauge.address(deviceAddress);
+    Serial.print("A MAX17043 device was found at address 0x"); Serial.println(_fuelGauge.address(), HEX);
+
+    //
+    // Reset the device.
+    //
+    Serial.println("Resetting device...");
+    _fuelGauge.reset();
+    delay(250);
+
+    //
+    // Issue a quickstart command and wait
+    // for the device to be ready.
+    //
+    Serial.println("Initiating quickstart mode...");
+    _fuelGauge.quickstart();
+    delay(125);
+
+    //
+    // Display an initial reading.
+    //
+    Serial.println("Reading device...");
+    Serial.println();
+    displayReading();
+  }
+  else
+  {
+    Serial.println("A MAX17043 device was not found!");
+    while (true);
+  }
 }
 
 void loop() {
@@ -173,7 +228,7 @@ void loop() {
   String currentTime = formattedTimeArray[2] + ":" + formattedTimeArray[3] + " " + formattedTimeArray[4];
 
   // get battery percentage
-  int batteryPercentage = 67;
+  uint8_t batteryPercentage = _fuelGauge.percent();
 
   if (currentTime != lastDisplayedTime && !device_mode && !menu) {
     lastDisplayedTime = currentTime;  // update the stored time
