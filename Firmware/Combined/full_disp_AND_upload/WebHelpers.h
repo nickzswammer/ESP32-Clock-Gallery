@@ -15,5 +15,6 @@ void ReportFileNotPresent(String target);
 void ReportCouldNotCreateFile(String target);
 void File_Upload();
 void Time_Upload();
+void Gallery_Interval_Upload();
 
 #endif

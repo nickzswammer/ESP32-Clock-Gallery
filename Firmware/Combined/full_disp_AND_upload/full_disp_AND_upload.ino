@@ -20,6 +20,7 @@
 // Wifi Libraries
 #include <WiFi.h>            //Built-in
 #include <ESP32WebServer.h>  //https://github.com/Pedroalbuquerque/ESP32WebServer download and place in your Libraries folder
+#include "esp_wifi.h"
 
 // SD Libraries
 #include "FS.h"
@@ -44,16 +45,14 @@
 #define BUTTON_3 33
 #define BUTTON_4 32
 
-#define LONG_PRESS_TIME 1500  // milliseconds
+#define LONG_PRESS_TIME 1500       // milliseconds
+#define uS_TO_S_FACTOR 1000000ULL  // 1e06
 
-#define MENU_ITEMS 2
+#define MENU_ITEMS 3
 
 #define DIRECTORY "/bin_images"
 
 AppState app;
-
-// battery percentage
-MAX1704X _fuelGauge = MAX1704X(MAX17043_mV);
 
 /* ========================== VARIABLES ========================== */
 
@@ -77,10 +76,20 @@ bool button4Held = false;
 
 String lastDisplayedTime = "";
 
+// clockvars for update clock stuff
+String currentTime;
+DateTime now;
+uint8_t batteryPercentage;
+
+
 uint8_t menu_selected_index = 0;
 
-int device_mode = 0;  // 0 is clock, 1 is display
-int menu = 0;         // 0 is menu off, 1 is menu on
+uint64_t uploadedGalleryInterval = 10ULL * uS_TO_S_FACTOR;  // default is 10 seconds until user sets (IN MICROSECONDS)
+                                                            // ULL prevents overflow so it is an unsigned long long
+
+bool device_mode = 0;  // 0 is clock, 1 is display
+bool menu = 0;         // 0 is menu off, 1 is menu on
+bool sleeping = 0;     // 0 is not sleeping, 1 is yes, to handle wake ups
 
 /* ========================== SETUP ========================== */
 
@@ -90,35 +99,13 @@ void setup() {
   display.setRotation(2);
   display.setFullWindow();
 
-  /* ===================== WIFI BLOCK ===================== */
-  WiFi.softAP(WIFI_SSID, WIFI_PASSWORD);  //Network and password for the access point gemerated by ESP32
-  Serial.println("Access Point started");
-  Serial.println("IP address: " + WiFi.softAPIP().toString());
-
   pinMode(BUTTON_1, INPUT_PULLUP);
   pinMode(BUTTON_2, INPUT_PULLUP);
   pinMode(BUTTON_3, INPUT_PULLUP);
   pinMode(BUTTON_4, INPUT_PULLUP);
 
-  /* ===================== SERVER COMMANDS ===================== */
-  server.on("/", SD_dir);
-  server.on("/upload", File_Upload);
-  server.on(
-    "/fupload", HTTP_POST, []() {
-      server.send(200);
-    },
-    handleFileUpload);
-  server.on("/timeUpload", Time_Upload);
-  server.on("/timeUploadProcess", HTTP_POST, handleTimeUpload);
-
-  // Catch-all route
-  server.onNotFound([]() {
-    server.sendHeader("Location", "/", true);
-    server.send(302);
-  });
-
-  server.begin();
-  Serial.println("HTTP server started");
+  /* ===================== WIFI BLOCK ===================== */
+  restartWiFiAndServer();
 
   /* ===================== INIT SD CARD ===================== */
   Serial.print(F("Initializing SD card... "));
@@ -162,35 +149,27 @@ void setup() {
   }
 
   /* ===================== INIT FUEL GUAGE ===================== */
-    //
-  // Initialize the fuel gauge without an address.
   //
-  Serial.println("Initializing the fuel gauge instance.");
-  _fuelGauge.begin(DEFER_ADDRESS);
-
-  Serial.println("SETUP EXECUTED!");
-    //
-  // Find a connected fuel gauge on the i2c bus.
+  // Initialize the serial interface.
   //
-  Serial.println("Searching for device...");
-  uint8_t deviceAddress = _fuelGauge.findFirstDevice();
+  Serial.begin(115200);
+  delay(250);
 
   //
-  // If a device is NOT found, the address returned will be 0.
+  // Wait for serial port to connect.
   //
-  if (deviceAddress > 0)
-  {
-    //
-    // Set the device address.
-    //
-    _fuelGauge.address(deviceAddress);
-    Serial.print("A MAX17043 device was found at address 0x"); Serial.println(_fuelGauge.address(), HEX);
+  while (!Serial) {}
+  Serial.println("Serial port initialized.\n");
 
+  //
+  // Initialize the fuel gauge.
+  //
+  if (FuelGauge.begin()) {
     //
     // Reset the device.
     //
     Serial.println("Resetting device...");
-    _fuelGauge.reset();
+    FuelGauge.reset();
     delay(250);
 
     //
@@ -198,7 +177,7 @@ void setup() {
     // for the device to be ready.
     //
     Serial.println("Initiating quickstart mode...");
-    _fuelGauge.quickstart();
+    FuelGauge.quickstart();
     delay(125);
 
     //
@@ -206,12 +185,9 @@ void setup() {
     //
     Serial.println("Reading device...");
     Serial.println();
-    displayReading();
-  }
-  else
-  {
-    Serial.println("A MAX17043 device was not found!");
-    while (true);
+    Serial.printf("Battery Percentage: %d\n", FuelGauge.percent());
+  } else {
+    Serial.println("The MAX17043 device was NOT found.\n");
   }
 }
 
@@ -222,14 +198,10 @@ void loop() {
   app.currButton3 = digitalRead(BUTTON_3);
   app.currButton4 = digitalRead(BUTTON_4);
 
-  // Get the current time from the RTC
-  DateTime now = rtc.now();
-  formatTime(now);
-  String currentTime = formattedTimeArray[2] + ":" + formattedTimeArray[3] + " " + formattedTimeArray[4];
+  // updates formatted time array with current RTC readings, also updates battery percentage
+  updateClock();
 
-  // get battery percentage
-  uint8_t batteryPercentage = _fuelGauge.percent();
-
+  // update clock once minute changes in RTC
   if (currentTime != lastDisplayedTime && !device_mode && !menu) {
     lastDisplayedTime = currentTime;  // update the stored time
 
@@ -268,12 +240,12 @@ void loop() {
 
   // regular short press behavior
   if (app.wasPressed(app.currButton1, app.prevButton1)) {
-    if (!button1Held && device_mode)
+    if (!button1Held && device_mode && !menu)
       handle_button_1();
   }
 
   // select prev file
-  if (app.wasPressed(app.currButton2, app.prevButton2 && device_mode)) {
+  if (app.wasPressed(app.currButton2, app.prevButton2 && device_mode && !menu)) {
     list_dir(SD, DIRECTORY);
 
     Serial.println("");
@@ -292,7 +264,7 @@ void loop() {
       Serial.printf("Selected File Index: [%d]: ", app.currentFileIndex);
     } else {
       // PAGE SELECT MODE: move to previous page
-      int currentPage = getCurrentPage();
+      uint8_t currentPage = getCurrentPage();
       currentPage = (currentPage - 1 + app.totalPages) % app.totalPages;
 
       app.currentFileIndex = currentPage * MAX_FILES_PER_PAGE;
@@ -310,7 +282,7 @@ void loop() {
   }
 
   // select next file
-  if (app.wasPressed(app.currButton3, app.prevButton3) && device_mode) {
+  if (app.wasPressed(app.currButton3, app.prevButton3) && device_mode && !menu) {
     list_dir(SD, DIRECTORY);
 
     Serial.println("");
@@ -319,6 +291,8 @@ void loop() {
       Serial.println("No files found");
       return;
     }
+
+    // FILE SELECT MODE: move onto next image to display
     if (app.fileMode) {
       app.currentFileIndex++;
 
@@ -328,7 +302,7 @@ void loop() {
       Serial.printf("Selected File Number: #[%d]: ", app.currentFileIndex);
     } else {
       // PAGE SELECT MODE: move to next page
-      int currentPage = getCurrentPage();
+      uint8_t currentPage = getCurrentPage();
       currentPage = (currentPage + 1 + app.totalPages) % app.totalPages;
       app.currentFileIndex = currentPage * MAX_FILES_PER_PAGE;
 
@@ -354,7 +328,7 @@ void loop() {
   }
 
   if (!app.currButton4 && (millis() - button4PressTime > LONG_PRESS_TIME)) {
-    if (!button4Held) {
+    if (!button4Held && !menu) {
       button4Held = true;
       Serial.println("Long Press Detected: Change Modes");
       device_mode = !device_mode;
@@ -366,7 +340,7 @@ void loop() {
   }
 
   if (app.wasPressed(app.currButton4, app.prevButton4)) {
-    if (!button4Held && device_mode) {
+    if (!button4Held && device_mode && !menu) {
       app.fileMode = !app.fileMode;
       if (app.fileMode) {
         Serial.println("Changed to File Select Mode");
@@ -376,9 +350,145 @@ void loop() {
       display_files();
     }
     // if in menu, handle sleep
-    // menu_selected_index: (0 for Sleep, 1 for hibernation)
-    else if (!button4Held && menu)
+    // menu_selected_index: (0/1 for Sleep Modes, 2 for hibernation (ONLY DISPLAY ONE IMAGE))
+    else if (!button4Held && menu) {
       Serial.printf("Button 4 In Menu Press Detected for: %d\n", menu_selected_index);
+      // sleep but show gallery and rotate every uploadedGalleryInterval
+      if (menu_selected_index == 0) {
+        Serial.println("In Sleep Mode, displaying gallery");
+        while (true) {
+          constexpr gpio_num_t WAKEUP_PIN = GPIO_NUM_26;        // button 1
+          gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);  // Trigger wake-up on high level
+
+          esp_sleep_enable_gpio_wakeup();
+          esp_sleep_enable_timer_wakeup(uploadedGalleryInterval);
+
+          // Stop server and Wi-Fi
+          Serial.println("Turning off WiFi...");
+          stopWifi();
+          Serial.println("WiFi Disabled.");
+
+          list_dir(SD, DIRECTORY);
+
+          Serial.printf("Selected File Number: #[%d]: ", app.currentFileIndex);
+          Serial.printf("Printing Current File: %s [%d]\n", getCurrentFileName(), app.currentFileIndex);
+          String current_file_location = String(DIRECTORY) + "/" + getCurrentFileName();
+          app.currentFile = SD.open(current_file_location, FILE_READ);
+          displayImageFromBin(app.currentFile);
+
+          // select next file
+          app.currentFileIndex++;
+
+          // wrap around
+          if (app.currentFileIndex > app.fileCount - 1)
+            app.currentFileIndex = 0;
+
+          // sleep
+          Serial.println("Now Sleeping.");
+          delay(500);
+          esp_light_sleep_start();
+
+          // After waking
+          Serial.println("Woke up!");
+          esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
+          if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+            Serial.println("Button Wake Detected — exiting sleep loop");
+            menu = 0;
+            displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+
+            // restart wifi
+            Serial.println("Restarting Wifi...");
+            restartWiFiAndServer();
+            Serial.println("Restarting Wifi completed.");
+
+            break;  // Exit the while(true)
+          }
+
+          Serial.println("Woke from timer — continuing slideshow");
+        }
+      }
+
+      // sleep but show clock and update every minute
+      else if (menu_selected_index == 1) {
+        Serial.println("In Sleep Mode, displaying clock");
+        while (true) {
+          constexpr gpio_num_t WAKEUP_PIN = GPIO_NUM_26;        // button 1
+          gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);  // Trigger wake-up on high level
+
+          esp_sleep_enable_gpio_wakeup();
+          esp_sleep_enable_timer_wakeup(60 * uS_TO_S_FACTOR);
+
+          // do clock here
+          waitUntilTopOfMinute();  // waits till top then updates
+
+          updateClock();
+
+          displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 1);
+
+          // After waking
+          esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
+          if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+            Serial.println("Button Wake Detected — exiting sleep loop");
+            menu = 0;
+            displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+
+            // restart wifi
+            Serial.println("Restarting Wifi...");
+            restartWiFiAndServer();
+            Serial.println("Restarting Wifi completed.");
+
+            break;  // Exit the while(true)
+          }
+          Serial.println("Woke from timer — continuing clock");
+        }
+      }
+
+      // hibernate and display current file until interrupt
+      else if (menu_selected_index == 2) {
+        Serial.println("In Hibernate Mode, displaying current image");
+        while (true) {
+          constexpr gpio_num_t WAKEUP_PIN = GPIO_NUM_26;        // button 1
+          gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);  // Trigger wake-up on high level
+          esp_sleep_enable_gpio_wakeup();
+
+          String current_file_location = String(DIRECTORY) + "/" + getCurrentFileName();
+          app.currentFile = SD.open(current_file_location, FILE_READ);
+
+          Serial.print("Displaying image: ");
+          Serial.println(app.currentFileName);
+          displayImageFromBin(app.currentFile);
+
+          Serial.println("Turning off WiFi...");
+          stopWifi();
+          Serial.println("WiFi Disabled.");
+
+          // sleep
+          Serial.println("Now hibernating.");
+          delay(500);
+          esp_light_sleep_start();
+
+          // After waking
+          Serial.println("Woke up!");
+          esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
+          // handle wakeup on GPIO
+          if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+            Serial.println("Button Wake Detected — exiting hibernation loop");
+            menu = 0;
+            displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+
+            // restart wifi
+            Serial.println("Restarting Wifi...");
+            restartWiFiAndServer();
+            Serial.println("Restarting Wifi completed.");
+
+            break;  // Exit the while(true)
+          }
+        }
+      }
+    }
   }
   app.resetButtons();
 }
@@ -584,6 +694,35 @@ void handleTimeUpload() {
   }
 }
 
+void handleGalleryIntervalUpload() {
+
+  if (server.hasArg("galleryIntervalUploadProcess")) {
+    String uploadedGalleryIntervalString = server.arg("galleryIntervalUploadProcess");
+
+    Serial.print("Uploaded gallery interval string: ");
+    Serial.println(uploadedGalleryIntervalString);
+
+    // handle interval conversion to a integer value multiplying by 60 million
+    uploadedGalleryInterval = (uint64_t)(uploadedGalleryIntervalString.toFloat() * 60.0 * 1000000.0);
+
+    // web response
+    webpage = "";
+    append_page_header();
+    webpage += F("<h2>Gallery interval was successfully uploaded</h2>");
+    webpage += F("<h3>Interval Recieved: ");
+    webpage += uploadedGalleryIntervalString + " minutes</h3>";
+    webpage += F("<a href='/'>[Back]</a><br><br>");
+    append_page_footer();
+    server.send(200, "text/html", webpage);
+  } else {
+    webpage = "";
+    append_page_header();
+    webpage += F("<h3>Error: Gallery interval was not uploaded</h3>");
+    webpage += F("<a href='/'>[Back]</a><br><br>");
+    append_page_footer();
+    server.send(400, "text/html", webpage);
+  }
+}
 
 //Delete a file from the SD, it is called in void SD_dir()
 void SD_file_delete(String filename) {
@@ -686,7 +825,7 @@ void list_dir(fs::FS& fs, const char* dirname) {
         file_index++;
       }
       app.fileNames[page_index][file_index] = String(file.name());
-      Serial.printf("FILE: %s\tSIZE: %d\n", file.name(), file.size());
+      //Serial.printf("FILE: %s\tSIZE: %d\n", file.name(), file.size());
     }
 
     file = list_root.openNextFile();
@@ -793,64 +932,65 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
   do {
     display.fillScreen(GxEPD_WHITE);
 
-    if (!minimized) {
-      display.setFont(&FreeSansBold12pt7b);
-      display.setTextColor(GxEPD_BLACK);
-      display.setTextSize(1);
-      display.setCursor(20, 30);
-      display.print("Audrey's Clock");
+    display.setFont(&FreeSansBold12pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    display.setTextSize(1);
+    display.setCursor(20, 30);
+    display.print("Audrey's Clock");
 
-      // Date line (e.g., "Tuesday, May 28, 2025")
-      display.setFont(&FreeSans9pt7b);
-      display.setCursor(20, 60);
-      display.print(dateStr);
+    // Date line (e.g., "Tuesday, May 28, 2025")
+    display.setFont(&FreeSans9pt7b);
+    display.setCursor(20, 60);
+    display.print(dateStr);
 
-      // Footer
-      display.setCursor(280, 290);
-      display.print("- from Nick <3");
+    display.setCursor(20, 290);
+    display.print(minimized ? "😴" : "😹");
 
-      // 🔋 Battery rectangle with percentage inside
-      int batteryX = 330;
-      int batteryY = 10;
-      int batteryWidth = 60;
-      int batteryHeight = 20;
-      int terminalWidth = 4;
-      int terminalHeight = 10;
+    // Footer
+    display.setCursor(280, 290);
+    display.print("- from Nick :)");
 
-      // Set font and color for battery label
-      display.setFont(&FreeSans9pt7b);
-      display.setTextColor(GxEPD_BLACK);
-      String batteryStr = String(batteryPercentage) + "%";
+    // 🔋 Battery rectangle with percentage inside
+    int batteryX = 330;
+    int batteryY = 10;
+    int batteryWidth = 60;
+    int batteryHeight = 20;
+    int terminalWidth = 4;
+    int terminalHeight = 10;
 
-      // Measure width/height of the text
-      int16_t tx1, ty1;
-      uint16_t tw, th;
-      display.getTextBounds(batteryStr, 0, 0, &tx1, &ty1, &tw, &th);
+    // Set font and color for battery label
+    display.setFont(&FreeSans9pt7b);
+    display.setTextColor(GxEPD_BLACK);
+    String batteryStr = String(batteryPercentage) + "%";
 
-      // Position to the left of the battery icon, vertically centered
-      int textX = batteryX - tw - 6;  // 6 px margin
-      int textY = batteryY + (batteryHeight + th) / 2 - 2;
+    // Measure width/height of the text
+    int16_t tx1, ty1;
+    uint16_t tw, th;
+    display.getTextBounds(batteryStr, 0, 0, &tx1, &ty1, &tw, &th);
 
-      display.setCursor(textX, textY);
-      display.print(batteryStr);
+    // Position to the left of the battery icon, vertically centered
+    int textX = batteryX - tw - 6;  // 6 px margin
+    int textY = batteryY + (batteryHeight + th) / 2 - 2;
 
-      // Draw outer battery shell
-      display.drawRect(batteryX, batteryY, batteryWidth, batteryHeight, GxEPD_BLACK);
+    display.setCursor(textX, textY);
+    display.print(batteryStr);
 
-      // Draw battery terminal
-      display.fillRect(batteryX + batteryWidth, batteryY + (batteryHeight - terminalHeight) / 2,
-                       terminalWidth, terminalHeight, GxEPD_BLACK);
+    // Draw outer battery shell
+    display.drawRect(batteryX, batteryY, batteryWidth, batteryHeight, GxEPD_BLACK);
 
-      // Draw fill bar (minimum width of 2 px for visibility)
-      int fillWidth = map(batteryPercentage, 0, 100, 0, batteryWidth - 4);
-      if (fillWidth > 0) {
-        display.fillRect(batteryX + 2, batteryY + 2, fillWidth, batteryHeight - 4, GxEPD_BLACK);
-      }
+    // Draw battery terminal
+    display.fillRect(batteryX + batteryWidth, batteryY + (batteryHeight - terminalHeight) / 2,
+                      terminalWidth, terminalHeight, GxEPD_BLACK);
 
-      // ✅ Restore default color for everything else
-      display.setTextColor(GxEPD_BLACK);
+    // Draw fill bar (minimum width of 2 px for visibility)
+    int fillWidth = map(batteryPercentage, 0, 100, 0, batteryWidth - 4);
+    if (fillWidth > 0) {
+      display.fillRect(batteryX + 2, batteryY + 2, fillWidth, batteryHeight - 4, GxEPD_BLACK);
     }
 
+    // ✅ Restore default color for everything else
+    display.setTextColor(GxEPD_BLACK);
+  
     // Draw main time (HH:mm)
     display.setFont(&FreeSansBold24pt7b);
     display.setTextSize(3);
@@ -878,7 +1018,7 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
 }
 
 void displayMenu() {
-  String menu_elements[MENU_ITEMS] = { "Sleep", "Hibernation (display one file)" };
+  String menu_elements[MENU_ITEMS] = { "Sleep (Show Gallery)", "Sleep (Show Clock)", "Hibernation (display one file)" };
   uint8_t curr_y_pos = 100;
 
   display.firstPage();
@@ -903,4 +1043,76 @@ void displayMenu() {
     }
 
   } while (display.nextPage());
+}
+
+// updates formatted time array with current RTC readings, also updates battery percentage
+void updateClock() {
+  // Get the current time from the RTC
+  now = rtc.now();
+  formatTime(now);
+  currentTime = formattedTimeArray[2] + ":" + formattedTimeArray[3] + " " + formattedTimeArray[4];
+
+  // get battery percentage
+  batteryPercentage = FuelGauge.percent();
+}
+
+void waitUntilTopOfMinute() {
+  now = rtc.now();
+  int seconds = now.second();
+  uint64_t delay_microseconds = (60.0 - seconds) * uS_TO_S_FACTOR;
+
+  esp_sleep_enable_timer_wakeup(delay_microseconds);
+
+  // stop wifi
+  Serial.println("Turning off WiFi...");
+  stopWifi();
+  Serial.println("WiFi Disabled.");
+
+  // display
+  displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 1);
+
+  // sleep
+  Serial.printf("Now sleeping %d seconds to align to top of minute.\n", 60 - seconds);
+  esp_light_sleep_start();
+
+  // After waking
+  Serial.printf("Woke up after %d seconds\n", 60 - seconds);
+}
+
+void stopWifi() {
+  server.stop();
+  esp_wifi_stop();
+}
+
+void restartWiFiAndServer() {
+  esp_wifi_start();
+  // 1. Set mode
+  WiFi.mode(WIFI_AP);
+
+  // 2. Start SoftAP
+  WiFi.softAP(WIFI_SSID, WIFI_PASSWORD);
+  Serial.println("Access Point restarted");
+  Serial.println("IP address: " + WiFi.softAPIP().toString());
+
+  // 3. Re-register all routes
+  server.on("/", SD_dir);
+  server.on("/upload", File_Upload);
+  server.on(
+    "/fupload", HTTP_POST, []() {
+      server.send(200);
+    },
+    handleFileUpload);
+  server.on("/timeUpload", Time_Upload);
+  server.on("/timeUploadProcess", HTTP_POST, handleTimeUpload);
+  server.on("/galleryIntervalUpload", Gallery_Interval_Upload);
+  server.on("/galleryIntervalUploadProcess", HTTP_POST, handleGalleryIntervalUpload);
+
+  server.onNotFound([]() {
+    server.sendHeader("Location", "/", true);
+    server.send(302);
+  });
+
+  // 4. Restart HTTP server
+  server.begin();
+  Serial.println("HTTP server restarted");
 }

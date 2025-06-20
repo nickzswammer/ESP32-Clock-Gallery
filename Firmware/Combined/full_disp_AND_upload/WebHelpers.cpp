@@ -32,6 +32,21 @@ void Time_Upload()
   server.send(200, "text/html",webpage);
 }
 
+//Upload a set time to the SD
+void Gallery_Interval_Upload()
+{
+  append_page_header();
+  webpage += F("<h3>Enter interval time (in minutes)</h3>");
+  webpage += F("<FORM action='/galleryIntervalUploadProcess' method='post'>");
+  webpage += F("<input class='buttons' type='number' step='0.1' min='0' name='galleryIntervalUploadProcess' id ='galleryIntervalUploadProcess' required><br><br>");
+  webpage += F("<button class='buttons' type='submit'>Set Interval</button>");
+  webpage += F("</form>");
+  webpage += F("<a href='/'>[Back]</a><br><br>");
+
+  append_page_footer();
+  server.send(200, "text/html",webpage);
+}
+
 void append_page_header() {
   webpage  = F("<!DOCTYPE html><html>");
   webpage += F("<head>");
@@ -77,7 +92,8 @@ void append_page_header() {
   webpage += F("<ul>");
   webpage += F("<li><a href='/'>Current Files</a></li>"); //Menu bar with commands
   webpage += F("<li><a href='/upload'>Upload a .bin File</a></li>"); 
-  webpage += F("<li><a href='/timeUpload'>Set Clock Time</a></li>"); 
+  webpage += F("<li><a href='/timeUpload'>Set Clock Time</a></li>");
+  webpage += F("<li><a href='/galleryIntervalUpload'>Set Gallery Interval</a></li>");
   webpage += F("</ul>");
 }
 //Saves repeating many lines of code for HTML page footers
