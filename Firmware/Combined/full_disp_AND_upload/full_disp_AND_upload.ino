@@ -44,6 +44,7 @@
 #define BUTTON_2 25
 #define BUTTON_3 33
 #define BUTTON_4 32
+#define ALRT 26
 
 #define LONG_PRESS_TIME 1500       // milliseconds
 #define uS_TO_S_FACTOR 1000000ULL  // 1e06
@@ -95,6 +96,11 @@ bool sleeping = 0;     // 0 is not sleeping, 1 is yes, to handle wake ups
 
 void setup() {
   Serial.begin(115200);
+  delay(250);
+
+  while (!Serial) {}
+  Serial.println("Serial port initialized.\n");
+
   display.init(115200);
   display.setRotation(2);
   display.setFullWindow();
@@ -103,6 +109,7 @@ void setup() {
   pinMode(BUTTON_2, INPUT_PULLUP);
   pinMode(BUTTON_3, INPUT_PULLUP);
   pinMode(BUTTON_4, INPUT_PULLUP);
+  pinMode(ALRT, INPUT_PULLUP);
 
   /* ===================== WIFI BLOCK ===================== */
   restartWiFiAndServer();
@@ -149,19 +156,6 @@ void setup() {
   }
 
   /* ===================== INIT FUEL GUAGE ===================== */
-  //
-  // Initialize the serial interface.
-  //
-  Serial.begin(115200);
-  delay(250);
-
-  //
-  // Wait for serial port to connect.
-  //
-  while (!Serial) {}
-  Serial.println("Serial port initialized.\n");
-
-  //
   // Initialize the fuel gauge.
   //
   if (FuelGauge.begin()) {
@@ -186,6 +180,9 @@ void setup() {
     Serial.println("Reading device...");
     Serial.println();
     Serial.printf("Battery Percentage: %d\n", FuelGauge.percent());
+    
+    FuelGauge.setThreshold(10); // set low battery threshold to 10%
+
   } else {
     Serial.println("The MAX17043 device was NOT found.\n");
   }
@@ -200,6 +197,63 @@ void loop() {
 
   // updates formatted time array with current RTC readings, also updates battery percentage
   updateClock();
+
+  // if alert, just display low battery
+  if (FuelGauge.alertIsActive())
+  {
+    display.firstPage();
+    do {
+      display.fillScreen(GxEPD_WHITE);  // clear the display
+      display.setTextColor(GxEPD_BLACK);
+      display.setFont(&FreeSansBold24pt7b);
+      display.setTextSize(3);
+
+      display.setCursor(20, 50);  // starting position (x,y)
+      display.print("CHARGE! LOW BATTERY");
+
+    } while (display.nextPage());
+
+    Serial.println("entering low power mode");
+    
+    while (true) 
+    {
+      constexpr gpio_num_t WAKEUP_PIN = GPIO_NUM_26;        // button 1
+      gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);  // Trigger wake-up on high level
+
+      esp_sleep_enable_gpio_wakeup();
+
+      // Stop server and Wi-Fi
+      Serial.println("Turning off WiFi...");
+      stopWifi();
+      Serial.println("WiFi Disabled.");
+
+      // sleep
+      Serial.println("Now Sleeping.");
+      delay(500);
+      esp_light_sleep_start();
+
+      // After waking
+      Serial.println("Woke up!");
+      esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
+      if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+        Serial.println("Button Wake Detected — exiting sleep loop");
+        menu = 0;
+        device_mode = 0;
+
+        displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+
+        // restart wifi
+        Serial.println("Restarting Wifi...");
+        restartWiFiAndServer();
+        Serial.println("Restarting Wifi completed.");
+
+        delay(1000); 
+
+        break;  // Exit the while(true)
+      }
+    }
+  }
 
   // update clock once minute changes in RTC
   if (currentTime != lastDisplayedTime && !device_mode && !menu) {
@@ -235,6 +289,10 @@ void loop() {
       Serial.print("Menu is now ");
       Serial.println(menu ? "Showing" : "Not Showing");
       menu ? displayMenu() : displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+
+      // also change device mode to clock if menu is not showing
+      device_mode = menu ? 1 : 0;
+      Serial.println(device_mode ? "" : "Device is now in Clock Mode");
     }
   }
 
@@ -395,6 +453,8 @@ void loop() {
           if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
             Serial.println("Button Wake Detected — exiting sleep loop");
             menu = 0;
+            device_mode = 0;
+
             displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
 
             // restart wifi
@@ -432,6 +492,8 @@ void loop() {
           if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
             Serial.println("Button Wake Detected — exiting sleep loop");
             menu = 0;
+            device_mode = 0;
+
             displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
 
             // restart wifi
@@ -477,6 +539,8 @@ void loop() {
           if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
             Serial.println("Button Wake Detected — exiting hibernation loop");
             menu = 0;
+            device_mode = 0;
+
             displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
 
             // restart wifi
@@ -980,7 +1044,7 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
 
     // Draw battery terminal
     display.fillRect(batteryX + batteryWidth, batteryY + (batteryHeight - terminalHeight) / 2,
-                      terminalWidth, terminalHeight, GxEPD_BLACK);
+                     terminalWidth, terminalHeight, GxEPD_BLACK);
 
     // Draw fill bar (minimum width of 2 px for visibility)
     int fillWidth = map(batteryPercentage, 0, 100, 0, batteryWidth - 4);
@@ -990,7 +1054,7 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
 
     // ✅ Restore default color for everything else
     display.setTextColor(GxEPD_BLACK);
-  
+
     // Draw main time (HH:mm)
     display.setFont(&FreeSansBold24pt7b);
     display.setTextSize(3);
@@ -1012,34 +1076,6 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
       display.setTextSize(1);
       display.setCursor(x_suffix, y_suffix);
       display.print(suffix);
-    }
-
-  } while (display.nextPage());
-}
-
-void displayMenu() {
-  String menu_elements[MENU_ITEMS] = { "Sleep (Show Gallery)", "Sleep (Show Clock)", "Hibernation (display one file)" };
-  uint8_t curr_y_pos = 100;
-
-  display.firstPage();
-  do {
-    display.fillScreen(GxEPD_WHITE);  // clear the display
-    display.setTextColor(GxEPD_BLACK);
-    display.setFont(&FreeSansBold24pt7b);
-    display.setTextSize(1);
-    display.setCursor(60, 50);  // starting position (x,y)
-    display.print("Menu");
-
-    display.setFont(&FreeSans9pt7b);
-
-    for (int i = 0; i < MENU_ITEMS; i++) {
-      if (i == menu_selected_index) {
-        display.setCursor(45, curr_y_pos - 2);
-        display.print(">");
-      }
-      display.setCursor(60, curr_y_pos);
-      display.print(menu_elements[i].c_str());
-      curr_y_pos += 30;
     }
 
   } while (display.nextPage());
@@ -1115,4 +1151,32 @@ void restartWiFiAndServer() {
   // 4. Restart HTTP server
   server.begin();
   Serial.println("HTTP server restarted");
+}
+
+void displayMenu() {
+  uint8_t curr_y_pos = 100;
+  String menu_elements[MENU_ITEMS] = { "Sleep (Show Gallery)", "Sleep (Show Clock)", "Hibernation (display one file)" };
+
+  display.firstPage();
+  do {
+    display.fillScreen(GxEPD_WHITE);  // clear the display
+    display.setTextColor(GxEPD_BLACK);
+    display.setFont(&FreeSansBold24pt7b);
+    display.setTextSize(1);
+    display.setCursor(60, 50);  // starting position (x,y)
+    display.print("Menu");
+
+    display.setFont(&FreeSans9pt7b);
+
+    for (int i = 0; i < MENU_ITEMS; i++) {
+      if (i == menu_selected_index) {
+        display.setCursor(45, curr_y_pos - 2);
+        display.print(">");
+      }
+      display.setCursor(60, curr_y_pos);
+      display.print(menu_elements[i].c_str());
+      curr_y_pos += 30;
+    }
+
+  } while (display.nextPage());
 }

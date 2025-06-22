@@ -16,7 +16,7 @@ struct AppState {
     int currButton2 = 1, prevButton2 = 0;
     int currButton3 = 1, prevButton3 = 0;
     int currButton4 = 1, prevButton4 = 0;
-    int currButton5 = 1, prevButton5 = 0;
+    int currALRT = 1, prevALRT = 0;
   
     // Display control
     bool fileMode = false; // file select mode or page increment mode

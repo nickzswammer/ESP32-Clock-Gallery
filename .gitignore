@@ -5,6 +5,12 @@
 /Firmware/Backend/image_processor/processed_files/
 /Firmware/Backend/image_processor/uploaded_files/
 
+# Ignore old not currently deployed code
+/Firmware/Audio/
+/Firmware/Backend
+/Firmware/Displays
+/Combined/disp_next_AND_SD_upload
+
 /Firmware/Backend/image_processor/debug_dithered.png
 
 # Ignore these files everywhere (recursive)
