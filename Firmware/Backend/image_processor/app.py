@@ -76,10 +76,8 @@ def process_image(filename):
             f.write(bytes([byte]))
 
 
-    return f"""
-    <h2>Conversion complete with dithering!</h2>
-    <a href="{url_for('download_file', filename=bin_filename)}" download>Download {bin_filename}</a>
-    """
+    return render_template('conversion_complete.html', bin_filename=bin_filename)
+
 
 
 @app.route('/download/<filename>')

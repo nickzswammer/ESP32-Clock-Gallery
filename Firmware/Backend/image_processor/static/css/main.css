@@ -1,4 +1,158 @@
 body {
-  margin: 0;
-  font-family: sans-serif;
+  background-color: #fff0f5;
+  font-family: "Segoe UI", "Comic Sans MS", sans-serif;
+  color: #5e3c58;
+  padding: 2em;
+  margin: 0 auto;
+  max-width: 800px;
+}
+
+h1 {
+  color: #e36bae;
+  text-align: center;
+  margin-top: 0.5em;
+  font-size: 1.8em;
+}
+
+h2,
+h3 {
+  color: #8c5b75;
+  text-align: center;
+  font-weight: normal;
+  margin: 0.5em 0;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 2em;
+  overflow: hidden;
+  background-color: #ffb6c1;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+li {
+  float: left;
+}
+
+li a {
+  display: block;
+  color: white;
+  text-align: center;
+  padding: 0.75em 1em;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 1em;
+}
+
+li a:hover {
+  background-color: #ff8bb3;
+  border-radius: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1em;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+th {
+  background-color: #ffe4f0;
+  color: #5e3c58;
+  padding: 0.8em;
+  text-align: center;
+  border-bottom: 2px solid #f7c2df;
+  font-size: 1em;
+}
+
+td {
+  padding: 0.8em;
+  text-align: center;
+  border-bottom: 1px solid #f3d3e8;
+  font-size: 0.95em;
+}
+
+tr:nth-child(even) {
+  background-color: #fff7fb;
+}
+
+tr:hover {
+  background-color: #fff0f5;
+}
+
+button,
+input[type="submit"] {
+  background-color: #ff8bb3;
+  color: white;
+  border: none;
+  padding: 0.5em 1.2em;
+  border-radius: 10px;
+  font-size: 0.95em;
+  margin: 0.2em;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+button:hover,
+input[type="submit"]:hover {
+  background-color: #f86aa1;
+}
+
+input[type="file"] {
+  margin: 1em 0;
+  padding: 0.6em;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  font-size: 0.95em;
+  color: #5e3c58;
+  background: #fff8fb;
+}
+
+form {
+  display: inline;
+}
+
+a {
+  display: inline-block;
+  margin-top: 1.5em;
+  text-decoration: none;
+  color: #e36bae;
+  font-size: 0.95em;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+.status {
+  text-align: center;
+  margin-top: 1em;
+  font-style: italic;
+  color: #8c5b75;
+}
+
+::file-selector-button {
+  background-color: #ffa4d4;
+  border: none;
+  padding: 0.4em 0.8em;
+  border-radius: 6px;
+  color: #5e3c58;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+::file-selector-button:hover {
+  background-color: #ff8bb3;
+}
+
+*,
+*:before,
+*:after {
+  box-sizing: border-box;
 }

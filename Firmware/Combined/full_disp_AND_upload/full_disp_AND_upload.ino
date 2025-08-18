@@ -55,6 +55,12 @@
 
 AppState app;
 
+// IMPORTANT: SYSTEM STATES
+enum { CLOCK_MODE,
+       DISPLAY_MODE,
+       MENU_MODE,
+       SLEEP_MODE } systemState;
+
 /* ========================== VARIABLES ========================== */
 
 ESP32WebServer server(80);
@@ -82,15 +88,16 @@ String currentTime;
 DateTime now;
 uint8_t batteryPercentage;
 
+// timeout vars
+const unsigned long SLEEP_TIMEOUT = 2 * 60 * 1000;  // 2 minutes
+unsigned long lastActivityTime = 0;
 
+// current menu item
 uint8_t menu_selected_index = 0;
 
+// default gallery change interval
 uint64_t uploadedGalleryInterval = 10ULL * uS_TO_S_FACTOR;  // default is 10 seconds until user sets (IN MICROSECONDS)
                                                             // ULL prevents overflow so it is an unsigned long long
-
-bool device_mode = 0;  // 0 is clock, 1 is display
-bool menu = 0;         // 0 is menu off, 1 is menu on
-bool sleeping = 0;     // 0 is not sleeping, 1 is yes, to handle wake ups
 
 /* ========================== SETUP ========================== */
 
@@ -110,6 +117,8 @@ void setup() {
   pinMode(BUTTON_3, INPUT_PULLUP);
   pinMode(BUTTON_4, INPUT_PULLUP);
   pinMode(ALRT, INPUT_PULLUP);
+
+  lastActivityTime = millis();  // Initialize activity timer
 
   /* ===================== WIFI BLOCK ===================== */
   restartWiFiAndServer();
@@ -180,8 +189,8 @@ void setup() {
     Serial.println("Reading device...");
     Serial.println();
     Serial.printf("Battery Percentage: %d\n", FuelGauge.percent());
-    
-    FuelGauge.setThreshold(10); // set low battery threshold to 10%
+
+    FuelGauge.setThreshold(10);  // set low battery threshold to 10%
 
   } else {
     Serial.println("The MAX17043 device was NOT found.\n");
@@ -198,65 +207,16 @@ void loop() {
   // updates formatted time array with current RTC readings, also updates battery percentage
   updateClock();
 
-  // if alert, just display low battery
-  if (FuelGauge.alertIsActive())
-  {
-    display.firstPage();
-    do {
-      display.fillScreen(GxEPD_WHITE);  // clear the display
-      display.setTextColor(GxEPD_BLACK);
-      display.setFont(&FreeSansBold24pt7b);
-      display.setTextSize(3);
+  checkLowBattery(); // checks if batteyr low and displays splash screen
 
-      display.setCursor(20, 50);  // starting position (x,y)
-      display.print("CHARGE! LOW BATTERY");
-
-    } while (display.nextPage());
-
-    Serial.println("entering low power mode");
-    
-    while (true) 
-    {
-      constexpr gpio_num_t WAKEUP_PIN = GPIO_NUM_26;        // button 1
-      gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);  // Trigger wake-up on high level
-
-      esp_sleep_enable_gpio_wakeup();
-
-      // Stop server and Wi-Fi
-      Serial.println("Turning off WiFi...");
-      stopWifi();
-      Serial.println("WiFi Disabled.");
-
-      // sleep
-      Serial.println("Now Sleeping.");
-      delay(500);
-      esp_light_sleep_start();
-
-      // After waking
-      Serial.println("Woke up!");
-      esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-
-      if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
-        Serial.println("Button Wake Detected — exiting sleep loop");
-        menu = 0;
-        device_mode = 0;
-
-        displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
-
-        // restart wifi
-        Serial.println("Restarting Wifi...");
-        restartWiFiAndServer();
-        Serial.println("Restarting Wifi completed.");
-
-        delay(1000); 
-
-        break;  // Exit the while(true)
-      }
-    }
+  // Auto-sleep after timeout
+  if (millis() - lastActivityTime > SLEEP_TIMEOUT) {
+    Serial.println("Inactivity timeout - entering clock sleep mode");
+    enterClockSleep();
   }
 
   // update clock once minute changes in RTC
-  if (currentTime != lastDisplayedTime && !device_mode && !menu) {
+  if (currentTime != lastDisplayedTime && systemState == CLOCK_MODE) {
     lastDisplayedTime = currentTime;  // update the stored time
 
     displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
@@ -276,34 +236,45 @@ void loop() {
 
   // detects button press
   if (!app.currButton1 && app.prevButton1) {
+    lastActivityTime = millis();  // Reset timer
+
     button1PressTime = millis();
     button1Held = false;
   }
 
   if (!app.currButton1 && (millis() - button1PressTime > LONG_PRESS_TIME)) {
+    lastActivityTime = millis();  // Reset timer
+
     if (!button1Held) {
       button1Held = true;
-      Serial.println("Long Press For Button 1 Detected: Toggle Menu");
-      menu = !menu;
+      Serial.println("\nLong Press For Button 1 Detected: Toggle Menu");
+
+      // toggle systemstate between menu and clock
+      systemState = systemState == MENU_MODE ? CLOCK_MODE : MENU_MODE;
 
       Serial.print("Menu is now ");
-      Serial.println(menu ? "Showing" : "Not Showing");
-      menu ? displayMenu() : displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+      Serial.println(systemState == MENU_MODE ? "Showing" : "Not Showing");
 
-      // also change device mode to clock if menu is not showing
-      device_mode = menu ? 1 : 0;
-      Serial.println(device_mode ? "" : "Device is now in Clock Mode");
+      // if system state is toggled to menu mode, display menu, else show the clock
+      systemState == MENU_MODE ? displayMenu() : displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+
+      // signify clock mode to serial
+      Serial.println(systemState == CLOCK_MODE ? "Device is now in Clock Mode" : "");
     }
   }
 
   // regular short press behavior
   if (app.wasPressed(app.currButton1, app.prevButton1)) {
-    if (!button1Held && device_mode && !menu)
+    lastActivityTime = millis();  // Reset timer
+
+    if (!button1Held && systemState == DISPLAY_MODE)
       handle_button_1();
   }
 
   // select prev file
-  if (app.wasPressed(app.currButton2, app.prevButton2 && device_mode && !menu)) {
+  if (app.wasPressed(app.currButton2, app.prevButton2 && systemState == DISPLAY_MODE)) {
+    lastActivityTime = millis();  // Reset timer
+
     list_dir(SD, DIRECTORY);
 
     Serial.println("");
@@ -334,13 +305,17 @@ void loop() {
   }
 
   // if menu open, select prev thing
-  else if (app.wasPressed(app.currButton2, app.prevButton2 && menu)) {
+  else if (app.wasPressed(app.currButton2, app.prevButton2 && systemState == MENU_MODE)) {
+    lastActivityTime = millis();  // Reset timer
+
     menu_selected_index = (menu_selected_index - 1 + MENU_ITEMS) % MENU_ITEMS;
     displayMenu();
   }
 
   // select next file
-  if (app.wasPressed(app.currButton3, app.prevButton3) && device_mode && !menu) {
+  if (app.wasPressed(app.currButton3, app.prevButton3) && systemState == DISPLAY_MODE) {
+    lastActivityTime = millis();  // Reset timer
+
     list_dir(SD, DIRECTORY);
 
     Serial.println("");
@@ -372,7 +347,9 @@ void loop() {
   }
 
   // if menu open, select prev thing
-  else if (app.wasPressed(app.currButton3, app.prevButton3 && menu)) {
+  else if (app.wasPressed(app.currButton3, app.prevButton3) && systemState == MENU_MODE) {
+    lastActivityTime = millis();  // Reset timer
+
     menu_selected_index = (menu_selected_index + 1) % MENU_ITEMS;
     displayMenu();
   }
@@ -381,24 +358,36 @@ void loop() {
 
   // detects button press
   if (!app.currButton4 && app.prevButton4) {
+    lastActivityTime = millis();  // Reset timer
+
     button4PressTime = millis();
     button4Held = false;
   }
 
-  if (!app.currButton4 && (millis() - button4PressTime > LONG_PRESS_TIME)) {
-    if (!button4Held && !menu) {
+  if (!app.currButton4 && (millis() - button4PressTime > LONG_PRESS_TIME)) 
+  {
+    lastActivityTime = millis();  // Reset timer
+
+    if (!button4Held && systemState != MENU_MODE) {
       button4Held = true;
-      Serial.println("Long Press Detected: Change Modes");
-      device_mode = !device_mode;
+      Serial.println("\nLong Press for Button 4 Detected: Change Modes");
+
+      // toggle systemstate between display and clock
+      systemState = systemState == DISPLAY_MODE ? CLOCK_MODE : DISPLAY_MODE;
 
       Serial.print("Device is now in ");
-      Serial.println(device_mode ? "Display Mode" : "Clock Mode");
-      device_mode ? display_files() : displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+      Serial.println(systemState == DISPLAY_MODE ? "Display Mode" : "Clock Mode");
+
+      // if system state is toggled to display mode, display all the files, else show the clock
+      systemState == DISPLAY_MODE ? display_files() : displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
     }
   }
 
-  if (app.wasPressed(app.currButton4, app.prevButton4)) {
-    if (!button4Held && device_mode && !menu) {
+  if (app.wasPressed(app.currButton4, app.prevButton4)) 
+  {
+    lastActivityTime = millis();  // Reset timer
+
+    if (!button4Held && systemState == DISPLAY_MODE) {
       app.fileMode = !app.fileMode;
       if (app.fileMode) {
         Serial.println("Changed to File Select Mode");
@@ -409,7 +398,7 @@ void loop() {
     }
     // if in menu, handle sleep
     // menu_selected_index: (0/1 for Sleep Modes, 2 for hibernation (ONLY DISPLAY ONE IMAGE))
-    else if (!button4Held && menu) {
+    else if (!button4Held && systemState == MENU_MODE) {
       Serial.printf("Button 4 In Menu Press Detected for: %d\n", menu_selected_index);
       // sleep but show gallery and rotate every uploadedGalleryInterval
       if (menu_selected_index == 0) {
@@ -420,6 +409,11 @@ void loop() {
 
           esp_sleep_enable_gpio_wakeup();
           esp_sleep_enable_timer_wakeup(uploadedGalleryInterval);
+
+          if (FuelGauge.percent() < 10)
+          {
+            break;
+          }
 
           // Stop server and Wi-Fi
           Serial.println("Turning off WiFi...");
@@ -451,9 +445,9 @@ void loop() {
           esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
 
           if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+            lastActivityTime = millis();  // Reset timer
             Serial.println("Button Wake Detected — exiting sleep loop");
-            menu = 0;
-            device_mode = 0;
+            systemState = CLOCK_MODE;
 
             displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
 
@@ -470,42 +464,8 @@ void loop() {
       }
 
       // sleep but show clock and update every minute
-      else if (menu_selected_index == 1) {
-        Serial.println("In Sleep Mode, displaying clock");
-        while (true) {
-          constexpr gpio_num_t WAKEUP_PIN = GPIO_NUM_26;        // button 1
-          gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);  // Trigger wake-up on high level
-
-          esp_sleep_enable_gpio_wakeup();
-          esp_sleep_enable_timer_wakeup(60 * uS_TO_S_FACTOR);
-
-          // do clock here
-          waitUntilTopOfMinute();  // waits till top then updates
-
-          updateClock();
-
-          displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 1);
-
-          // After waking
-          esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-
-          if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
-            Serial.println("Button Wake Detected — exiting sleep loop");
-            menu = 0;
-            device_mode = 0;
-
-            displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
-
-            // restart wifi
-            Serial.println("Restarting Wifi...");
-            restartWiFiAndServer();
-            Serial.println("Restarting Wifi completed.");
-
-            break;  // Exit the while(true)
-          }
-          Serial.println("Woke from timer — continuing clock");
-        }
-      }
+      else if (menu_selected_index == 1)
+        enterClockSleep();
 
       // hibernate and display current file until interrupt
       else if (menu_selected_index == 2) {
@@ -514,6 +474,9 @@ void loop() {
           constexpr gpio_num_t WAKEUP_PIN = GPIO_NUM_26;        // button 1
           gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);  // Trigger wake-up on high level
           esp_sleep_enable_gpio_wakeup();
+
+          if(FuelGauge.percent() < 10)
+            break;
 
           String current_file_location = String(DIRECTORY) + "/" + getCurrentFileName();
           app.currentFile = SD.open(current_file_location, FILE_READ);
@@ -537,9 +500,10 @@ void loop() {
 
           // handle wakeup on GPIO
           if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+            lastActivityTime = millis();  // Reset timer
             Serial.println("Button Wake Detected — exiting hibernation loop");
-            menu = 0;
-            device_mode = 0;
+
+            systemState = CLOCK_MODE;
 
             displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
 
@@ -668,6 +632,8 @@ void printDirectory(const char* dirname, uint8_t levels) {
 
 //Download a file from the SD, it is called in void SD_dir()
 void SD_file_download(String filename) {
+  lastActivityTime = millis();  // Reset timer
+
   if (app.sdPresent) {
     File download = SD.open(filename);
     if (download) {
@@ -684,6 +650,8 @@ void SD_file_download(String filename) {
 File UploadFile;
 //Upload a new file to the Filing system
 void handleFileUpload() {
+  lastActivityTime = millis();  // Reset timer
+
   HTTPUpload& uploadfile = server.upload();  //See https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WebServer/srcv
                                              //For further information on 'status' structure, there are other reasons such as a failed transfer that could be used
   if (uploadfile.status == UPLOAD_FILE_START) {
@@ -722,6 +690,7 @@ void handleFileUpload() {
 String uploadedTimeString;
 
 void handleTimeUpload() {
+  lastActivityTime = millis();  // Reset timer
 
   if (server.hasArg("timeUploadProcess")) {
     uploadedTimeString = server.arg("timeUploadProcess");
@@ -759,6 +728,7 @@ void handleTimeUpload() {
 }
 
 void handleGalleryIntervalUpload() {
+  lastActivityTime = millis();  // Reset timer
 
   if (server.hasArg("galleryIntervalUploadProcess")) {
     String uploadedGalleryIntervalString = server.arg("galleryIntervalUploadProcess");
@@ -790,6 +760,8 @@ void handleGalleryIntervalUpload() {
 
 //Delete a file from the SD, it is called in void SD_dir()
 void SD_file_delete(String filename) {
+  lastActivityTime = millis();  // Reset timer
+
   Serial.print("Filename: ");
   Serial.println(filename);
 
@@ -835,6 +807,8 @@ void display_files() {
     display.setTextSize(4);
     display.setCursor(60, 20);  // starting position (x,y)
     display.print("Select Files");
+
+    list_dir(SD, DIRECTORY);
 
     int cursor_position_y = 80;
     display.setTextSize(1);
@@ -971,6 +945,7 @@ String formatTime(DateTime now) {
 }
 
 void displayClock(String time, String dateStr, int batteryPercentage, int minimized) {
+  updateClock();
   // Split time into main and suffix (e.g., "12:45 PM")
   String mainTime = time;
   String suffix = "";
@@ -1007,14 +982,15 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
     display.setCursor(20, 60);
     display.print(dateStr);
 
+    // sleep indication
     display.setCursor(20, 290);
-    display.print(minimized ? "😴" : "😹");
+    display.print(minimized ? "Sleep" : "Active");
 
     // Footer
     display.setCursor(280, 290);
     display.print("- from Nick :)");
 
-    // 🔋 Battery rectangle with percentage inside
+    // Battery rectangle with percentage inside
     int batteryX = 330;
     int batteryY = 10;
     int batteryWidth = 60;
@@ -1052,7 +1028,7 @@ void displayClock(String time, String dateStr, int batteryPercentage, int minimi
       display.fillRect(batteryX + 2, batteryY + 2, fillWidth, batteryHeight - 4, GxEPD_BLACK);
     }
 
-    // ✅ Restore default color for everything else
+    // Restore default color for everything else
     display.setTextColor(GxEPD_BLACK);
 
     // Draw main time (HH:mm)
@@ -1095,7 +1071,7 @@ void updateClock() {
 void waitUntilTopOfMinute() {
   now = rtc.now();
   int seconds = now.second();
-  uint64_t delay_microseconds = (60.0 - seconds) * uS_TO_S_FACTOR;
+  uint64_t delay_microseconds = (59.0 - seconds) * uS_TO_S_FACTOR;
 
   esp_sleep_enable_timer_wakeup(delay_microseconds);
 
@@ -1108,11 +1084,11 @@ void waitUntilTopOfMinute() {
   displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 1);
 
   // sleep
-  Serial.printf("Now sleeping %d seconds to align to top of minute.\n", 60 - seconds);
+  Serial.printf("Now sleeping %d seconds to align to top of minute.\n", 59.0 - seconds);
   esp_light_sleep_start();
 
   // After waking
-  Serial.printf("Woke up after %d seconds\n", 60 - seconds);
+  Serial.printf("Woke up after %d seconds\n", 59.0 - seconds);
 }
 
 void stopWifi() {
@@ -1155,7 +1131,7 @@ void restartWiFiAndServer() {
 
 void displayMenu() {
   uint8_t curr_y_pos = 100;
-  String menu_elements[MENU_ITEMS] = { "Sleep (Show Gallery)", "Sleep (Show Clock)", "Hibernation (display one file)" };
+  String menu_elements[MENU_ITEMS] = { "Sleep (Show Gallery)", "Sleep (Show Clock)", "Hibernation (display current file)" };
 
   display.firstPage();
   do {
@@ -1179,4 +1155,119 @@ void displayMenu() {
     }
 
   } while (display.nextPage());
+}
+
+void enterClockSleep() {
+  Serial.println("In Sleep Mode, displaying clock");
+  while (true) {
+    constexpr gpio_num_t WAKEUP_PIN = GPIO_NUM_26;        // button 1
+    gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);  // Trigger wake-up on high level
+
+    if(FuelGauge.percent() < 10)
+      break;
+
+    esp_sleep_enable_gpio_wakeup();
+    esp_sleep_enable_timer_wakeup(60 * uS_TO_S_FACTOR);
+
+    // do clock here
+    waitUntilTopOfMinute();  // waits till top then updates
+
+    displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 1);
+
+    // After waking
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
+    if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+      lastActivityTime = millis();  // Reset timer
+      Serial.println("Button Wake Detected — exiting sleep loop");
+
+      systemState = CLOCK_MODE;
+
+      displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+
+      // restart wifi
+      Serial.println("Restarting Wifi...");
+      restartWiFiAndServer();
+      Serial.println("Restarting Wifi completed.");
+
+      break;  // Exit the while(true)
+    }
+    Serial.println("Woke from timer — continuing clock");
+  }
+}
+
+void checkLowBattery(){
+  // if low, just display low battery
+  if (FuelGauge.percent() < 10) {
+    display.firstPage();
+    do {
+      display.fillScreen(GxEPD_WHITE);  // clear the display
+      display.setTextColor(GxEPD_BLACK);
+      display.setFont(&FreeSansBold24pt7b);
+      display.setTextSize(1);
+
+      display.setCursor(20, 50);  // starting position (x,y)
+      display.print("CHARGE");
+      display.setCursor(20, 100);  // starting position (x,y)
+      display.print("LOW BATTERY!");
+
+    } while (display.nextPage());
+
+    Serial.println("entering low power mode");
+
+    while (true) {
+      constexpr gpio_num_t WAKEUP_PIN = GPIO_NUM_26;        // button 1
+      gpio_wakeup_enable(WAKEUP_PIN, GPIO_INTR_LOW_LEVEL);  // Trigger wake-up on high level
+
+      esp_sleep_enable_gpio_wakeup();
+      esp_sleep_enable_timer_wakeup(3600ULL * uS_TO_S_FACTOR);
+
+      // Stop server and Wi-Fi
+      Serial.println("Turning off WiFi...");
+      stopWifi();
+      Serial.println("WiFi Disabled.");
+
+      // sleep
+      Serial.println("Now Sleeping.");
+      delay(500);
+      esp_light_sleep_start();
+
+      // After waking
+      Serial.println("Woke up!");
+      esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+
+      if (wakeup_reason == ESP_SLEEP_WAKEUP_GPIO) {
+        lastActivityTime = millis();  // Reset timer
+        Serial.println("Button Wake Detected — exiting sleep loop");
+        systemState = CLOCK_MODE;
+
+        displayClock(currentTime, formattedTimeArray[0], batteryPercentage, 0);
+
+        // restart wifi
+        Serial.println("Restarting Wifi...");
+        restartWiFiAndServer();
+        Serial.println("Restarting Wifi completed.");
+
+        delay(1000);
+
+        break;  // Exit the while(true)
+      }
+      else if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER)
+      {
+        Serial.println("Timer Wake Detected — exiting sleep loop and checking battery");
+        if (FuelGauge.percent() < 10)
+        {
+          // restart wifi
+          Serial.println("Restarting Wifi...");
+          restartWiFiAndServer();
+          Serial.println("Restarting Wifi completed.");
+
+          delay(1000);
+          break;
+        }
+      }
+      if (FuelGauge.percent() < 10)
+        break;
+    }
+  }
 }
