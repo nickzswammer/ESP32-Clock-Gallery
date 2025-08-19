@@ -74,9 +74,12 @@ char months[12][4] = {
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
 };
 
-// for long button presses (B1 & B4)
+// for long button presses (B1 B2 B4)
 unsigned long button1PressTime = 0;
 bool button1Held = false;
+
+unsigned long button2PressTime = 0;
+bool button2Held = false;
 
 unsigned long button4PressTime = 0;
 bool button4Held = false;
@@ -271,11 +274,28 @@ void loop() {
       handle_button_1();
   }
 
+  // detects button press
+  if (!app.currButton2 && app.prevButton2) {
+    lastActivityTime = millis();  // Reset timer
+
+    button2PressTime = millis();
+    button2Held = false;
+  }
+
+  if (!app.currButton2 && (millis() - button2PressTime > LONG_PRESS_TIME)) {
+    lastActivityTime = millis();  // Reset timer
+
+    if (!button2Held) {
+      button2Held = true;
+      Serial.println("\nLong Press For Button 2 Detected: Resetting Device");
+
+      ESP.restart();
+    }
+  }
+
   // select prev file
   if (app.wasPressed(app.currButton2, app.prevButton2 && systemState == DISPLAY_MODE)) {
     lastActivityTime = millis();  // Reset timer
-
-    list_dir(SD, DIRECTORY);
 
     Serial.println("");
 
@@ -315,8 +335,6 @@ void loop() {
   // select next file
   if (app.wasPressed(app.currButton3, app.prevButton3) && systemState == DISPLAY_MODE) {
     lastActivityTime = millis();  // Reset timer
-
-    list_dir(SD, DIRECTORY);
 
     Serial.println("");
 
@@ -420,11 +438,10 @@ void loop() {
           stopWifi();
           Serial.println("WiFi Disabled.");
 
-          list_dir(SD, DIRECTORY);
-
           Serial.printf("Selected File Number: #[%d]: ", app.currentFileIndex);
-          Serial.printf("Printing Current File: %s [%d]\n", getCurrentFileName(), app.currentFileIndex);
+          Serial.printf("Printing Current File: %s [%d]\n", getCurrentFileName().c_str(), app.currentFileIndex);
           String current_file_location = String(DIRECTORY) + "/" + getCurrentFileName();
+          Serial.printf("At location: %s\n", current_file_location.c_str());
           app.currentFile = SD.open(current_file_location, FILE_READ);
           displayImageFromBin(app.currentFile);
 
@@ -524,7 +541,7 @@ void loop() {
 /* ========================== FUNCTION DEFINITION ========================== */
 /* ===================== SERVER FUNCTIONS ===================== */
 void handle_button_1() {
-  Serial.printf("Printing Current File: %s [%d]\n", getCurrentFileName(), app.currentFileIndex);
+  Serial.printf("Printing Current File: %s [%d]\n", getCurrentFileName().c_str(), app.currentFileIndex);
   String current_file_location = String(DIRECTORY) + "/" + getCurrentFileName();
   app.currentFile = SD.open(current_file_location, FILE_READ);
   displayImageFromBin(app.currentFile);
@@ -648,36 +665,57 @@ void SD_file_download(String filename) {
 
 //Handles the file upload a file to the SD
 File UploadFile;
-//Upload a new file to the Filing system
-void handleFileUpload() {
-  lastActivityTime = millis();  // Reset timer
 
-  HTTPUpload& uploadfile = server.upload();  //See https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WebServer/srcv
-                                             //For further information on 'status' structure, there are other reasons such as a failed transfer that could be used
+//Upload a new file to the Filing system
+size_t total_bytes_written = 0;
+
+void handleFileUpload() {
+  HTTPUpload& uploadfile = server.upload();
   if (uploadfile.status == UPLOAD_FILE_START) {
+    // Reset the counter at the start of a new upload
+    total_bytes_written = 0; 
+    
     String filename = uploadfile.filename;
     if (!filename.startsWith("/")) filename = "/" + filename;
     filename = String(DIRECTORY) + filename;
     Serial.print("Upload File Name: ");
     Serial.println(filename);
-    SD.remove(filename);                         //Remove a previous version, otherwise data is appended the file again
-    UploadFile = SD.open(filename, FILE_WRITE);  //Open the file for writing in SD (create it, if doesn't exist)
+    SD.remove(filename);
+    UploadFile = SD.open(filename, FILE_WRITE);
     filename = String();
+
   } else if (uploadfile.status == UPLOAD_FILE_WRITE) {
-    if (UploadFile) UploadFile.write(uploadfile.buf, uploadfile.currentSize);  // Write the received bytes to the file
+    if (UploadFile) {
+      size_t bytes_written = UploadFile.write(uploadfile.buf, uploadfile.currentSize);
+      // Keep track of the total bytes written
+      total_bytes_written += bytes_written; 
+    }
+
   } else if (uploadfile.status == UPLOAD_FILE_END) {
-    if (UploadFile)  //If the file was successfully created
-    {
-      UploadFile.close();  //Close the file again
-      Serial.print("Upload Size: ");
-      Serial.println(uploadfile.totalSize);
-      webpage = "";
-      append_page_header();
-      webpage += F("<h3>File was successfully uploaded</h3>");
-      webpage += F("<h2>Uploaded File Name: ");
-      webpage += uploadfile.filename + "</h2>";
-      webpage += F("<h2>File Size: ");
-      webpage += file_size(uploadfile.totalSize) + "</h2><br><br>";
+    if (UploadFile) {
+      UploadFile.close(); // Finalize the write
+      Serial.printf("Upload finished. Total expected: %u, Total written: %u\n", uploadfile.totalSize, total_bytes_written);
+
+      // **** ADD THIS CHECK ****
+      if (total_bytes_written == uploadfile.totalSize) {
+        // SUCCESS: Send a success response
+        Serial.println("File upload successful and size matches.");
+        webpage = "";
+        append_page_header();
+        webpage += F("<h3>File was successfully uploaded</h3>");
+        webpage += F("<h2>Uploaded File Name: ");
+        webpage += uploadfile.filename + "</h2>";
+        webpage += F("<h2>File Size: ");
+        webpage += file_size(uploadfile.totalSize) + "</h2><br><br>";
+      } else {
+        // FAILURE: Send an error response
+        Serial.println("!!! File upload failed: Size mismatch.");
+        webpage = "";
+        append_page_header();
+        webpage += F("<h3>ERROR: File upload failed.</h3>");
+        webpage += F("<h4>The transfer may have been interrupted. Please try again.</h4>");
+      }
+      
       webpage += F("<a href='/'>[Back]</a><br><br>");
       append_page_footer();
       server.send(200, "text/html", webpage);
@@ -747,7 +785,10 @@ void handleGalleryIntervalUpload() {
     webpage += uploadedGalleryIntervalString + " minutes</h3>";
     webpage += F("<a href='/'>[Back]</a><br><br>");
     append_page_footer();
+    delay(500);
     server.send(200, "text/html", webpage);
+    delay(500);
+
   } else {
     webpage = "";
     append_page_header();
@@ -766,14 +807,17 @@ void SD_file_delete(String filename) {
   Serial.println(filename);
 
   if (app.sdPresent) {
+    delay(500);
     Serial.println("SD Is Present");
     SendHTML_Header();
     File dataFile = SD.open(filename, FILE_READ);  //Now read data from SD Card
+    delay(500);
     if (dataFile) {
       Serial.println("Datafile Is Present");
 
       if (SD.remove(filename)) {
         Serial.println(F("File deleted successfully"));
+
         webpage += "<h3>File '" + filename + "' has been erased</h3>";
         webpage += F("<a href='/'>[Back]</a><br><br>");
       } else {
@@ -841,39 +885,41 @@ void display_files() {
 }
 
 void list_dir(fs::FS& fs, const char* dirname) {
-  Serial.printf("\nListing directory (non-recursive): %s\n", dirname);
+  Serial.printf("\nRe-scanning directory: %s\n", dirname);
 
   File list_root = fs.open(dirname);
   if (!list_root || !list_root.isDirectory()) {
-    Serial.println("Failed to open directory");
+    Serial.println("ERROR: Failed to open directory");
     return;
   }
 
-  int page_index = 0;       // iterate through the pages
-  int file_index = 0;       // iterate thru files on one page
-  int loop_file_count = 0;  // file count
+  int new_file_count = 0; // Use a local counter, starting from 0.
 
   File file = list_root.openNextFile();
-  while (file && loop_file_count < app.fileCount) {
+  // Loop ONLY depends on finding a file. No more "app.fileCount".
+  while (file) {
     if (!file.isDirectory()) {
-      if (loop_file_count != 0 && loop_file_count % MAX_FILES_PER_PAGE == 0) {
-        page_index++;
-        file_index = 0;
-      } else if (loop_file_count != 0) {
-        file_index++;
+      // Prevent writing past the end of your app.fileNames array
+      if (new_file_count < (MAX_PAGES * MAX_FILES_PER_PAGE)) {
+        // Simplified and safer way to calculate array indices
+        int page_index = new_file_count / MAX_FILES_PER_PAGE;
+        int file_index = new_file_count % MAX_FILES_PER_PAGE;
+        app.fileNames[page_index][file_index] = String(file.name());
+        new_file_count++; // Increment count ONLY after successfully storing a file
+      } else {
+        Serial.println("WARNING: Maximum file limit reached. Some files not listed.");
+        break; // Stop if the array is full
       }
-      app.fileNames[page_index][file_index] = String(file.name());
-      //Serial.printf("FILE: %s\tSIZE: %d\n", file.name(), file.size());
     }
-
-    file = list_root.openNextFile();
-    loop_file_count++;
+    file = list_root.openNextFile(); // Get the next file for the next loop iteration
   }
-  app.fileCount = loop_file_count;
+
+  // Now, update the global variables with the new, correct counts.
+  app.fileCount = new_file_count;
   app.totalPages = (app.fileCount + MAX_FILES_PER_PAGE - 1) / MAX_FILES_PER_PAGE;
   list_root.close();
 
-  Serial.printf("\nStored %d filenames in app.fileNames[]\n", loop_file_count);
+  Serial.printf("Scan complete. Found and stored %d filenames.\n", app.fileCount);
 }
 
 void displayImageFromBin(File& file) {
@@ -881,20 +927,29 @@ void displayImageFromBin(File& file) {
   uint16_t height = file.read() | (file.read() << 8);
 
   int size = (width * height) / 8;
-  Serial.printf("Attempting to allocate %d bytes\n", size);
+  Serial.printf("Attempting to allocate %d bytes for a %dx%d image\n", size, width, height);
   Serial.print("Free heap: ");
   Serial.println(ESP.getFreeHeap());
 
   uint8_t* buffer = (uint8_t*)malloc(size);
   if (!buffer) {
     Serial.println("Memory alloc failed!");
-    while (true)
-      ;
+    file.close(); // Close the file before restarting
+    ESP.restart();
     return;
   }
 
-  file.read(buffer, size);
+  // VITAL CHECK: Verify that the read was successful
+  size_t bytes_read = file.read(buffer, size);
+  if (bytes_read != size) {
+    Serial.printf("!!! SD Read Error: Expected %d bytes, but only got %lu\n", size, bytes_read);
+    free(buffer);     // Clean up the allocated memory
+    file.close();     // Close the file
+    // Optional: You could display an error message on the e-ink screen here
+    return;           // Exit the function to prevent displaying a corrupt image
+  }
 
+  // If the code reaches here, the read was successful.
   display.firstPage();
   do {
     display.fillScreen(GxEPD_WHITE);
@@ -915,6 +970,9 @@ int getCurrentPageFile() {
 String getCurrentFileName() {
   int page = getCurrentPage();
   int file = getCurrentPageFile();
+
+  Serial.println(app.fileNames[page][file]);
+
   return app.fileNames[page][file];
 }
 

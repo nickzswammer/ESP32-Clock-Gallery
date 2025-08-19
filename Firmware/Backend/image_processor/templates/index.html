@@ -1,14 +1,12 @@
 {% extends 'base.html' %}
 
 {% block head %}
-
+<title>Upload Images</title>
 {% endblock %}
 
 {% block body %}
-<title>Upload An Image</title>
 <form action="/success" method="POST" enctype="multipart/form-data">
-    <input class="buttons" type="file" name="file" />
+    <input class="buttons" type="file" name="file" multiple />
     <input class="buttons" type="submit" value="Upload" />
 </form>
-
 {% endblock %}
