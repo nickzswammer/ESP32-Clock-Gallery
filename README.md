@@ -155,5 +155,3 @@ python main.py
 ## Author
 
 **Nicholas Zhang**
-
-```
