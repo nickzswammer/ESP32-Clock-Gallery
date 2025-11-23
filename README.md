@@ -1,10 +1,18 @@
 # ESP32 E-Paper Clock / Gallery Display
 
+  | ![Fully Assembled Front Side](/docs/front.jpeg) | 
+  |:--:| 
+  | *Clock Frontside* |
+
 A customizable ESP32-based image clock gallery project, combining Arduino firmware, Python scripting, electronics, and PCB design. This project allows users to upload images via a web interface, convert them to a binary format suitable for display on a clock-style device, and manage them on the ESP32.
 
 ---
 
 ## Features
+
+  | ![Power Management Block Diagram](/docs/ESP32_PWR.png) | 
+  |:--:| 
+  | *Power Management Block Diagram* |
 
 - **Embedded / Microcontroller:**
   - ESP32 main controller
@@ -23,6 +31,10 @@ A customizable ESP32-based image clock gallery project, combining Arduino firmwa
   - Integrated power circuitry with MOSFET-based power muxing
   - Battery protection and charging circuitry
   - SPI and I²C routed to peripherals for modularity
+
+  | ![Exploded Component View](/docs/exploded.jpeg) | 
+  |:--:| 
+  | *Internal Component View* |
 
 ---
 
@@ -109,46 +121,6 @@ project_root/
 - Mounting points for pushbuttons
 - Openings for charging port, buttons, and display window
 - 3d printed
-
----
-
-## Dependencies
-
-- Python 3.x
-- Flask
-- Pillow (`PIL`)
-- Optional: zipfile module (standard library)
-
-Install Python dependencies:
-
-```bash
-pip install flask pillow
-````
-
----
-
-## Usage
-
-1. Run the Flask server:
-
-```bash
-python main.py
-```
-
-2. Navigate to `http://localhost:5000` in your browser.
-3. Upload one or multiple images.
-4. Download the ZIP archive containing `.bin` files.
-5. Transfer the `.bin` files to your ESP32 via SPI, I²C, or other storage method.
-6. The ESP32 will display the images on the connected screen.
-
----
-
-## Future Enhancements
-
-* Add support for color displays
-* Include image rotation and custom scaling
-* Web interface to schedule image display by time
-* Over-the-air updates for images
 
 ---
 
