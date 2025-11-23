@@ -97,6 +97,10 @@ project_root/
 
 ## PCB & Electronics
 
+| ![PCB Layout View](/docs/PCB.png) | 
+|:--:| 
+| *PCB Layout View* |
+
 - **2-layer PCB:**
   - Integrated power supply with custom MOSFET power muxing
   - Battery protection and charging
